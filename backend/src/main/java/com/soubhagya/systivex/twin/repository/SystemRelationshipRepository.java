@@ -20,4 +20,10 @@ public interface SystemRelationshipRepository extends JpaRepository<SystemRelati
 
     boolean existsBySourceIdAndTargetIdAndRelationshipType(
             UUID sourceId, UUID targetId, SystemRelationshipType relationshipType);
+
+    @EntityGraph(attributePaths = {"source", "target"})
+    List<SystemRelationship> findBySourceId(UUID sourceId);
+
+    @EntityGraph(attributePaths = {"source", "target"})
+    List<SystemRelationship> findByTargetId(UUID targetId);
 }

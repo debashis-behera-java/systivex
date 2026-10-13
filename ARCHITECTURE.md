@@ -51,13 +51,16 @@ being changed, and the thing being changed must never self-authorize.
 The control plane is a single Spring Boot deployment with strict module boundaries.
 The `twin` module exists in outline (`model`, `repository`, `service`, `api`
 packages) plus the Phase 4 `observation` package (scanner + sync, repository
-connector only); the remaining target modules are **not yet created** — no placeholder
+connector only) and the Phase 5 `intelligence` package (read-only impact
+analysis only); the remaining target modules are **not yet created** — no placeholder
 packages exist for them by decision:
 
 - `twin` — System Twin model and connectors (**model + persistence + minimal
   CRUD API exist**; repository connector exists since Phase 4, telemetry
   connectors still planned)
-- `intelligence` — change impact, simulation, risk assessment (planned)
+- `intelligence` — change impact (**deterministic read-only impact traversal
+  exists since Phase 5**: `GET /api/v1/twin/impact`; simulation and risk
+  assessment still planned)
 - `policy` — policy evaluation and approval workflow (planned)
 - `execution` — controlled, auditable action dispatch (planned)
 - `verification` — post-change checks against twin + runtime (planned)
@@ -218,8 +221,12 @@ in lockstep by `ddl-auto=validate`, and CRUD behind DTOs — plus, since
 Phase 4, the first real content: a read-only repository connector that
 models the four target services, their databases/tables, APIs, and
 dependencies as connector-owned rows (stable `target-*` external refs,
-provenance in metadata). No twin package beyond `twin` + `observation`,
-no telemetry ingestion, no reasoning yet.
+provenance in metadata) — plus, since Phase 5, the first reasoning over
+that content: a read-only deterministic impact traversal (`intelligence`
+package, `GET /api/v1/twin/impact`) that reports potentially affected
+components with ordered evidence paths over persisted edges. No twin
+package beyond `twin` + `observation` + `intelligence`, no telemetry
+ingestion, no simulation/risk/policy/execution yet.
 
 ## 6. Trust boundaries
 
@@ -249,7 +256,13 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
 
 - **REST** for twin queries, change proposals, approvals, execution records.
   Implemented so far: twin entity/relationship CRUD under `/api/v1/twin`
-  (no filtering/pagination yet); proposals/approvals/records are still planned.
+  (no filtering/pagination yet) plus read-only impact analysis
+  (`GET /api/v1/twin/impact`: 1–10 starts by UUID or external ref,
+  `maxDepth` 1–10 default 6, `includeTypes` default
+  SERVICE/API/DATABASE/TABLE; deterministic BFS with FORWARD/REVERSE
+  evidence paths, per-path revisit cycle guard, 500-node / 2000-path caps,
+  400 on invalid input, 404 on unknown identifiers);
+  proposals/approvals/records are still planned.
 - **SSE** for streaming long-running analysis/simulation progress (planned).
 - No WebSockets at this stage (see `DECISIONS.md`).
 
@@ -291,6 +304,13 @@ Implemented:
   sync trigger in the control plane (`observation` package); 15 entities /
   18 edges modelling the target environment, verified in tests (control
   plane suite now 51: 31 pre-existing + 20 new).
+- Change-impact analysis (Phase 5): read-only deterministic BFS over the
+  persisted twin graph in the control plane (`intelligence` package);
+  `GET /api/v1/twin/impact` returns impacted services/APIs/databases/
+  tables with ordered FORWARD/REVERSE evidence paths and per-step
+  explanations (see `DECISIONS.md` D23). No migration, no new
+  dependencies; verified in tests (control plane suite now 88: 51
+  pre-existing + 37 new).
 
 Why PostgreSQL + Flyway + a relational graph at this stage: the records the
 control plane will eventually authorize against (twin state, proposals,
@@ -301,8 +321,9 @@ consumer yet (see `DECISIONS.md` D10).
 
 Intentionally absent (not bugs — deferred by decision):
 
-- Twin telemetry ingestion, intelligence, policy, execution, verification
-  modules (the repository connector is Phase 4, above).
+- Twin telemetry ingestion, simulation/risk intelligence, policy,
+  execution, verification modules (the repository connector is Phase 4,
+  above; read-only impact traversal is Phase 5, above).
 - Redis, Spring AI / Ollama, security, frontend.
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
   detection, any agent use of telemetry (later 3B slices and later).

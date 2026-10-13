@@ -84,13 +84,31 @@ consequential actions through explicit control-plane authorization.
   guard (403 off loopback, no header trust). 51 tests green (31 existing
   + 20 new). The control plane still consumes no telemetry and no agent
   exists — see `DECISIONS.md` D22.
+- Phase 5 change-impact analysis (implemented 2026-10-10, live verification
+  pending): the first real `intelligence` module (`backend/.../intelligence/`)
+  answers read-only `GET /api/v1/twin/impact?from=<uuid|externalRef>&...`
+  (1–10 starts, `maxDepth` 1–10 default 6, `includeTypes` default
+  SERVICE/API/DATABASE/TABLE) with deterministic BFS over the persisted
+  graph — impacted services/APIs/databases/tables plus ordered evidence
+  paths recording the FORWARD/REVERSE direction of every step and a
+  per-step explanation (downstream dependencies labelled as reachability,
+  never confirmed breakage; unknown relationship types transparently
+  generic). Cycles terminate via a per-path revisit guard and are reported;
+  caps (500 nodes / 2000 paths) truncate explicitly. One read-only
+  transaction, no migration, no new dependencies. 88 tests green (51
+  existing + 37 new). Runtime note: the tracked example config binds
+  `127.0.0.1`, but a pre-existing live `application.properties` does not
+  inherit it — run with `SERVER_ADDRESS=127.0.0.1` (or add the bind to the
+  live file) to keep the local boundary; see `DECISIONS.md` D23 and
+  `THREAT_MODEL.md` §3a.
 
 **Not yet implemented** (planned architecture only):
 
 - Twin telemetry ingestion (metrics/traces/logs into the twin),
   Git integration
 - Agent orchestration, tooling, evidence model
-- Policy / risk / approval engine and controlled execution, simulation, verification
+- Policy / risk / approval engine and controlled execution, simulation
+  (beyond read-only impact paths), verification
 - Cross-database checkout atomicity/reconciliation, cache (Redis), Spring AI / Ollama, frontend
 - Trace exploration UI (Tempo), unified trace/log UI, anomaly detection,
   any agent or automated use of telemetry (Loki log exploration is done;

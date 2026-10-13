@@ -1,13 +1,72 @@
 # Systivex Project Status
 
-Last verified: **2026-10-09** (Asia/Kolkata). This document must be updated
+Last verified: **2026-10-10** (Asia/Kolkata). This document must be updated
 whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 4 — Twin observation: read-only repository connector (implemented;
-live verification complete 2026-10-09, ready for review).** Phases 0–3B-2 below
+**Phase 5 — Deterministic change-impact analysis (implemented 2026-10-10;
+automated tests green, live verification pending).** Phases 0–4 below
 are kept as history.
+
+## What is complete (Phase 5, 2026-10-10 — implementation + automated tests complete)
+
+- [x] `intelligence` package in the control plane (new, first real module —
+      no other new packages): `ImpactAnalysisService` (read-only BFS),
+      `ImpactController` (`GET /api/v1/twin/impact`), `ImpactResponse`
+      (starts/impacted/paths/limits/note DTOs), `ImpactDirection`
+      (FORWARD/REVERSE per step). No new dependencies, no migration.
+- [x] Repository addition only: `findBySourceId` / `findByTargetId` on
+      `SystemRelationshipRepository` (both `@EntityGraph(source,target)`,
+      repository-tested). The analysis itself loads one read-only snapshot
+      via the existing `findAll` (no N+1); entity/relationship counts are
+      identical before and after every query (asserted in tests).
+- [x] Traversal semantics over the actual stored directions (verified
+      against `TargetRepositoryScanner` + `SystemRelationshipType`):
+      SERVICE —CALLS→ SERVICE, SERVICE —DEPENDS_ON→ DATABASE,
+      DATABASE —CONTAINS→ TABLE, SERVICE —WRITES→ TABLE,
+      SERVICE —EXPOSES→ API — each both forward and reverse, direction
+      recorded per step. Reverse steps explain dependence ("may affect");
+      forward steps list downstream dependencies as reachability, never
+      confirmed breakage. Unknown types (e.g. manual `READS`) get a generic
+      structural-reachability sentence — no invented semantics.
+- [x] Determinism + bounds: sorted starts/adjacency/output; 1–10 starts
+      (blank/oversized → 400 pre-traversal, unknown → 404);
+      `maxDepth` 1–10 default 6; `includeTypes` default
+      SERVICE/API/DATABASE/TABLE (filtered types still traversed through);
+      500-node / 2000-path caps truncate explicitly with reason; per-path
+      revisit guard always terminates revisits and reports `cycleEncountered`
+      only for genuine directed cycles (the acyclic Phase 4 graph reports
+      false; backtracks and undirected-only loops terminate silently); alternative paths to visited nodes still recorded;
+      starts listed separately at depth zero, never as impacted; every
+      impacted entity has ≥1 complete path. `snapshotObservedAt` is an
+      observation timestamp, not a graph revision.
+- [x] Evidence: `target-table:inventory_db.inventory_items` →
+      inventory-service + inventory_db (depth 1), order-service / sibling
+      tables / inventory API (depth 2), gateway-service (depth 3), each with
+      exact typed paths (e.g. order-service via WRITES↑ then CALLS↑);
+      UUID and external-ref inputs agree; multi-start union correct;
+      manual 2-cycle terminates and reports; repeat queries byte-stable
+      (modulo timestamp); error bodies leak no secrets/stack traces.
+- [x] Tests: 88 green, 0 failures (51 pre-existing + 37 new:
+      `ImpactAnalysisServiceTest` 18 pure-BFS unit tests — all 10
+      direction/explanation cases, diamond, cycle, self-loop, disconnected,
+      multi-start, determinism, maxDepth, node/path caps, unknown type,
+      includeTypes, evidence completeness; `ImpactApiTest` 19 HTTP/API
+      integration tests — real 15/18 graph, UUID/ref parity, 400/404 cases,
+      filters, manual cycle, read-only proof, stability, leakage, finder
+      checks); `package -DskipTests` builds. `backend/target-services/`
+      and `observability/` untouched (verified via `git status`).
+- [ ] LIVE VERIFICATION (pending): control-plane boot + sync + impact
+      queries against local PostgreSQL 18 not observed in this phase
+      (no credential use, no service restarts, nothing claimed beyond
+      automated tests). Verdict: READY FOR REVIEW — implementation +
+      automated tests complete.
+- [ ] STILL DEFERRED: Tempo, twin telemetry ingestion, unified trace/log UI,
+      agents, simulation/risk/policy/execution/verification, Redis, brokers,
+      K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
+      broad authentication (Milestone 2C item 2 still open), column-level
+      lineage, READS inference, pagination beyond response limits.
 
 ## What is complete (Phase 4, 2026-10-09 — implementation + automated tests + live verification complete)
 
@@ -562,7 +621,8 @@ These are **deferred by decision**, not missing by accident. Do not report them 
   (Loki log exploration is Phase 3B-2, above.)
 - Agent orchestration, tool mediation, simulation, evidence model.
 - Policy / approval / controlled-execution / verification logic.
-- Filtering, pagination, graph traversal, bulk import on the twin API.
+- Filtering, pagination (beyond impact-query `includeTypes`/caps), bulk import
+  on the twin API. (Read-only impact traversal is Phase 5, above.)
 - Authentication/authorization on the API.
 - Redis configuration or usage.
 - Spring AI / Ollama integration, model configuration.
@@ -681,10 +741,13 @@ Phase 0 record (2026-09-28) is retained below for history.
 
 1. ~~Repository connector reading the target services into twin rows~~ DONE
    (Phase 4, above).
-2. Authentication on any API before the surface leaves the local machine
+2. ~~Deterministic read-only change-impact analysis over the twin graph~~ DONE
+   (Phase 5, above — impact paths only, no simulation/risk/policy).
+3. Authentication on any API before the surface leaves the local machine
    (still open — the Phase 4 loopback bind + guard is a development
-   boundary, not auth).
-3. Twin telemetry ingestion: consume the observed metrics/traces/logs
+   boundary, not auth; Phase 5 adds no new auth but documents the
+   effective-bind caveat in D23).
+4. Twin telemetry ingestion: consume the observed metrics/traces/logs
    contract (Phase 3A/3B-1/3B-2) into twin rows — still without agents or
    execution.
 

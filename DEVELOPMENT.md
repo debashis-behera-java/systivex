@@ -121,12 +121,13 @@ $env:Path="C:\Program Files\Java\jdk-21.0.10\bin;" + $env:Path
 ./mvnw test
 ```
 
-Expected (verified 2026-10-09): `Tests run: 51, Failures: 0, Errors: 0` —
+Expected (verified 2026-10-10): `Tests run: 88, Failures: 0, Errors: 0` —
 service unit tests plus Testcontainers-backed migration, repository, and API
-integration tests, 2 observability tests (tracing active, health UP), and
+integration tests, 2 observability tests (tracing active, health UP),
 20 Phase 4 observation tests (scanner mapping/fail-closed, sync
-idempotency/ownership/rollback, HTTP trigger, loopback guard).
-Docker Desktop must be
+idempotency/ownership/rollback, HTTP trigger, loopback guard), and
+37 Phase 5 impact tests (18 deterministic BFS unit tests + 19 HTTP/API
+integration tests against the real 15/18 graph). Docker Desktop must be
 running; the developer's local database is never touched by tests.
 
 ## 5. How to start the backend
@@ -383,8 +384,62 @@ Notes and limits:
   are created/updated. Manual rows are preserved; an identity collision
   fails the whole sync with 409 and rolls back (nothing partial).
 - Bad roots fail with 400 before any write. The run is one transaction.
-- Localhost-only: the server binds `127.0.0.1` by default (see
-  `application.example.properties`; add `server.address=127.0.0.1` to your
-  existing live `application.properties` copy too) and the endpoint
-  refuses non-loopback peers with 403. No watchers, schedulers, Git
+- Localhost-only: the tracked `application.example.properties` binds
+  `127.0.0.1`, and the endpoint refuses non-loopback peers with 403.
+  A pre-existing live `application.properties` does NOT inherit the example
+  file (verified 2026-10-10: the live file has no `server.address` line),
+  so for local runs either add `server.address=127.0.0.1` to the live file
+  or start with the environment override `SERVER_ADDRESS=127.0.0.1`
+  (relaxed binding for `server.address`). Do not bind `0.0.0.0` without an
+  authentication story and a recorded review. No watchers, schedulers, Git
   remotes, or telemetry ingestion — those are deferred by decision.
+
+## 11. Change-impact analysis (Phase 5)
+
+Read-only BFS over the synced twin graph (control plane running per §5,
+twin synced per §10 — tests use Testcontainers instead):
+
+```powershell
+# Potentially affected components for a table change, with evidence paths:
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/twin/impact?from=target-table:inventory_db.inventory_items" |
+  Select-Object -ExpandProperty impacted | Select-Object type, externalRef, depth, viaStart
+# -> inventory-service + inventory_db (depth 1), order-service, sibling tables,
+#    inventory API (depth 2), gateway-service (depth 3), ... each with >= 1 path
+#    in .paths recording the FORWARD/REVERSE direction of every step.
+
+# Multiple starts (union), bounded depth, filtered output types:
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/twin/impact?from=target-table:inventory_db.inventory_items&from=target-table:payment_db.payments&maxDepth=3&includeTypes=SERVICE"
+```
+
+Notes and limits:
+
+- `from` accepts entity UUIDs or `external_ref` values, 1–10 per call;
+  blank or oversized input fails 400 before any graph work; unknown
+  identifiers fail 404. `maxDepth` defaults to 6 (bounded 1–10).
+  `includeTypes` defaults to SERVICE, API, DATABASE, TABLE; filtered-out
+  types are still traversed through, only omitted from the output.
+- One `@Transactional(readOnly=true)` snapshot per call: entity and
+  relationship counts are identical before and after every query (asserted
+  in tests). No migration, no writes, no filesystem or network access.
+- Traversal follows stored directions both ways and records each step:
+  reverse CALLS/DEPENDS_ON/WRITES/CONTAINS/EXPOSES explain which components
+  depend on the changed one ("may affect"); forward steps list downstream
+  dependencies explicitly as reachability, never confirmed breakage.
+  Relationship types without documented domain meaning (including manual
+  rows, e.g. READS) are included as structural reachability with a generic
+  explanation — no invented semantics.
+- Over-approximation is by design: `WRITES` links a service to every table
+  in its owned database (Phase 4 granularity), and no `READS` edges exist,
+  so results are "potentially affected", not a blast-radius proof.
+- Cycles: any revisit is cut so traversal terminates, but
+  `cycleEncountered:true` is reported only for genuine directed cycles
+  (one consistent traversal direction around the loop — directed 2-cycles
+  over distinct relationships, self-loops, returns to a start via another
+  edge). Bidirectional backtracks over the same relationship and
+  undirected-only loops (diamonds, service—table—database triangles)
+  terminate silently. Alternative paths
+  to an already-reached node are still reported. Caps truncate explicitly:
+  500 nodes (`truncationReason: node-cap`) / 2000 paths (`path-cap`).
+- `snapshotObservedAt` is the observation timestamp of the call, not a
+  graph revision. Same input over an unchanged graph returns identically
+  ordered results (starts, adjacency, impacted, and paths are all sorted).

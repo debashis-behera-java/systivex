@@ -2,7 +2,7 @@
 
 Record of binding decisions taken at project foundation (2026-09-28) and
 extended in Phase 1 and Phase 2A (2026-09-29), Phase 2B and Phase 3A (2026-09-30),
-Phase 3B-1/3B-2 (2026-10-06/07), and Phase 4 (2026-10-09).
+Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), and Phase 5 (2026-10-10).
 Status labels: **decided** (binding now) / **planned** (intent, not yet implemented).
 
 ## D1. Java 21 — decided
@@ -391,6 +391,53 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
 - **State:** Implemented and tested (20 new tests, 51 green total, build
   succeeds). Local live boot pending the control-plane credential
   (see `PROJECT_STATUS.md`).
+
+## D23. Deterministic read-only change-impact traversal — decided (2026-10-10)
+
+- **Decision:** The first `intelligence` module is a read-only deterministic
+  BFS over the persisted twin graph (`intelligence` package, control plane
+  only): `GET /api/v1/twin/impact` resolves 1–10 starting entities (UUID or
+  `external_ref`, sorted; blank/oversized → 400 before any graph work,
+  unknown → 404) and returns impacted SERVICE/API/DATABASE/TABLE entities
+  with ordered evidence paths. Every step records FORWARD vs. REVERSE
+  against the stored direction (`CALLS`/`DEPENDS_ON`/`CONTAINS`/`WRITES`/
+  `EXPOSES` per D22) plus a per-step sentence: reverse steps explain
+  dependence ("may affect"), forward steps list downstream dependencies as
+  reachability, never confirmed breakage. Types without documented domain
+  meaning (including manual rows such as `READS`) are included as
+  structural reachability with a generic sentence — no invented semantics.
+  One `@Transactional(readOnly=true)` snapshot (single `findAll` with the
+  existing `@EntityGraph`, so no N+1); two additive fetch-joined finders
+  (`findBySourceId`/`findByTargetId`) cover adjacency queries and are
+  repository-tested. Caps (500 nodes / 2000 paths) truncate explicitly with
+  a reason; per-path revisit guard always terminates revisits and reports
+  `cycleEncountered` only for genuine directed cycles (one consistent
+  traversal direction around the loop — the acyclic Phase 4 graph reports
+  false; bidirectional backtracks and undirected-only loops such as
+  diamonds or service—table—database triangles terminate silently). `snapshotObservedAt` is an observation timestamp, not
+  a graph revision — no `createdAt`-max revision claim, no migration. No
+  new dependencies, no risk/policy/execution/telemetry content.
+- **Rationale:** The twin has had content but no reasoning since Phase 4;
+  impact traversal is the smallest useful consumer: it exercises the real
+  stored directions in both directions, establishes the evidence-path
+  pattern later simulation/risk/policy work must reuse, and stays inside
+  the existing trust model (read-only GET alongside the existing open twin
+  GETs — no new mutating surface, hence no new auth infrastructure; the
+  loopback bind note below still applies).
+- **Effective localhost boundary (verified, not assumed):** the tracked
+  example config carries `server.address=127.0.0.1`, but the live
+  git-ignored `application.properties` does NOT inherit tracked files —
+  verified 2026-10-10 (22-line live file, no `server.address` line; file
+  contents otherwise uninspected, file never edited). Effective bind is
+  therefore the Spring default (all interfaces) unless the operator sets
+  `SERVER_ADDRESS=127.0.0.1` or adds the bind to the live file. Previous
+  live verification used the environment override for exactly this reason.
+  No claim is made that loopback is active by default; `DEVELOPMENT.md`
+  §10–§11 documents the required runtime configuration. Broad
+  authentication (Milestone 2C item 2) stays open and still gates any
+  non-local exposure.
+- **State:** Implemented and tested (37 new tests, 88 green total, build
+  succeeds). Live verification pending (see `PROJECT_STATUS.md`).
 
 ## Supersession rule
 

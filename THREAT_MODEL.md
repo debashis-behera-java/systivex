@@ -154,6 +154,29 @@ itself a place data can leak. The following holds for the current pipeline
 - **Sampling 1.0 is local-only.** Full trace sampling is proportional to
   development traffic. Any shared or higher-traffic environment needs a
   sampling decision first.
+- **Phase 5 impact query (2026-10-10): read-only, same trust level as the
+  existing twin GETs.** `GET /api/v1/twin/impact` performs no mutation,
+  execution, filesystem scanning, or external calls — one read-only
+  transaction over already-persisted twin rows (counts unchanged after
+  queries, asserted in tests). Input is validated and size-bounded before
+  any graph work (1–10 starts, blank rejected, `maxDepth` 1–10,
+  `includeTypes` against the closed enum; oversized input fails 400 without
+  traversal; unknown identifiers fail 404) per T2; error bodies reuse the
+  existing handler (no secrets, no stack traces — asserted in tests). No
+  authentication infrastructure is introduced: like the existing twin GETs,
+  this endpoint is local-development-only and must not be exposed beyond
+  the machine without the deferred auth story (see §3: still open).
+  **Binding caveat (evidence, not assumption):** the tracked example binds
+  `127.0.0.1`, but a pre-existing live `application.properties` does not
+  inherit it — verified 2026-10-10 that the live file carries no
+  `server.address` line — so the effective bind is the framework default
+  unless `SERVER_ADDRESS=127.0.0.1` is set or the live file is given the
+  bind (see `DECISIONS.md` D23, `DEVELOPMENT.md` §10–§11). Impact results
+  are advisory reachability ("potentially affected", per-path evidence
+  included), never authorization or fact about the live system (T1/T3):
+  over-approximation (`WRITES` is per-database, no `READS` edges) and
+  staleness (`snapshotObservedAt` is an observation timestamp, not a
+  revision) must block consequential use, not permit it.
 
 ## 3. Out-of-scope today, in-scope for design
 
