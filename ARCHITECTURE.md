@@ -59,9 +59,10 @@ packages exist for them by decision:
 - `twin` — System Twin model and connectors (**model + persistence + minimal
   CRUD API exist**; repository connector exists since Phase 4, health/counter
   runtime annotation exists since Phase 6, trace/log presence still planned)
-- `intelligence` — change impact (**deterministic read-only impact traversal
-  exists since Phase 5**: `GET /api/v1/twin/impact`; simulation and risk
-  assessment still planned)
+- `intelligence` — change impact and risk (**deterministic read-only impact traversal
+  exists since Phase 5**: `GET /api/v1/twin/impact`; **ordinal risk
+  classification exists since Phase 7**: `GET /api/v1/twin/risk` over impact
+  paths plus runtime metadata; simulation still planned)
 - `policy` — policy evaluation and approval workflow (planned)
 - `execution` — controlled, auditable action dispatch (planned)
 - `verification` — post-change checks against twin + runtime (planned)
@@ -272,6 +273,12 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
   namespaced `runtime` metadata key, bounded receipt, 400/404/409
   fail-closed with full rollback);
   proposals/approvals/records are still planned.
+  Change-risk assessment (`GET /api/v1/twin/risk`: same `from`/`maxDepth`/
+  `includeTypes` conventions as impact; ordinal `LOW`/`MEDIUM`/`HIGH`/
+  `UNKNOWN` levels with sorted reasons and `uncertain`/`stale` flags over
+  impact depth, path fan-out, service health, cumulative failure counters,
+  and 30-minute freshness; read-only, advisory, never authorization —
+  see `DECISIONS.md` D25);
 - **SSE** for streaming long-running analysis/simulation progress (planned).
 - No WebSockets at this stage (see `DECISIONS.md`).
 
@@ -327,6 +334,12 @@ Implemented:
   metadata key of matched `target-service:*` rows (one transaction,
   fail-closed, bounded receipt; see `DECISIONS.md` D24). No migration, no
   new dependencies; trace/log presence deliberately absent.
+- Change-risk assessment (Phase 7): ordinal classification in the control
+  plane (`intelligence` package); `GET /api/v1/twin/risk` joins the Phase 5
+  impacted set with Phase 6 runtime facts (depth base, 5+ path fan-out,
+  health, cumulative failures, 30-minute freshness; sorted reasons,
+  uncertainty flags; see `DECISIONS.md` D25). No traversal duplication, no
+  migration, no new dependencies, no writes.
 
 Why PostgreSQL + Flyway + a relational graph at this stage: the records the
 control plane will eventually authorize against (twin state, proposals,
@@ -337,10 +350,11 @@ consumer yet (see `DECISIONS.md` D10).
 
 Intentionally absent (not bugs — deferred by decision):
 
-- Twin trace/log presence signals, simulation/risk intelligence, policy,
+- Twin trace/log presence signals, simulation, policy,
   execution, verification modules (the repository connector is Phase 4,
   above; read-only impact traversal is Phase 5, above; health/counter
-  annotation is Phase 6, above).
+  annotation is Phase 6, above; ordinal risk classification is Phase 7,
+  above).
 - Redis, Spring AI / Ollama, security, frontend.
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
   detection, any agent use of telemetry (later 3B slices and later).
@@ -349,6 +363,7 @@ Intentionally absent (not bugs — deferred by decision):
 - Target-service cross-database atomicity (rejected in D17; reconciliation is
   future work, not missing plumbing).
 
-Next architectural step (see `PROJECT_STATUS.md`): deterministic risk
-assessment grounded in the impact paths plus the observed runtime facts —
-still without agents or execution.
+Next architectural step (see `PROJECT_STATUS.md`): policy evaluation over
+the versioned risk taxonomy — still without agents or execution, and never
+exposed beyond the local machine before the deferred authentication story
+lands.

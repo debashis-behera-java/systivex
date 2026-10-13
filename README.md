@@ -115,6 +115,14 @@ consequential actions through explicit control-plane authorization.
   advances. One transaction per run, no migration, no new dependencies.
   Trace/log presence deliberately not collected (no privacy-safe source).
   41 new tests green. See `DECISIONS.md` D24.
+- Phase 7 risk assessment (implemented 2026-10-14, live verification
+  pending): ordinal classification in `backend/.../intelligence/` joining
+  the Phase 5 impacted set with Phase 6 runtime facts via
+  `GET /api/v1/twin/risk` (same validation conventions; taxonomy `risk-v1`:
+  depth base, 5+ path fan-out, health, cumulative failure counters, 30m
+  freshness; sorted reasons with `uncertain`/`stale` flags; read-only,
+  advisory, never authorization). No traversal duplication, no migration,
+  no new dependencies. 36 new tests green. See `DECISIONS.md` D25.
 
 **Not yet implemented** (planned architecture only):
 
@@ -144,7 +152,7 @@ Systivex/
 │       │   ├── SystivexApplication.java
 │       │   ├── twin/{model,repository,service,api}/
 │       │   ├── observation/           # Phase 4: read-only repo connector + POST /api/v1/twin/sync
-│       │   └── intelligence/          # Phase 5: read-only impact BFS + GET /api/v1/twin/impact
+│       │   ├── intelligence/          # Phase 5: impact BFS + GET /api/v1/twin/impact; Phase 7: risk + GET /api/v1/twin/risk
 │       │   └── telemetry/             # Phase 6: pull-based runtime annotation + POST /api/v1/twin/observations
 │       ├── main/resources/application.properties          # LOCAL ONLY, git-ignored
 │       ├── main/resources/application.example.properties  # tracked safe template

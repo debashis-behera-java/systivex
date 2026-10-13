@@ -121,16 +121,18 @@ $env:Path="C:\Program Files\Java\jdk-21.0.10\bin;" + $env:Path
 ./mvnw test
 ```
 
-Expected (verified 2026-10-13): `Tests run: 131, Failures: 0, Errors: 0` —
+Expected (verified 2026-10-14): `Tests run: 169, Failures: 0, Errors: 0` —
 service unit tests plus Testcontainers-backed migration, repository, and API
 integration tests, 2 observability tests (tracing active, health UP),
 20 Phase 4 observation tests (scanner mapping/fail-closed, sync
 idempotency/ownership/rollback, HTTP trigger, loopback guard),
 37 Phase 5 impact tests (18 deterministic BFS unit tests + 19 HTTP/API
-integration tests against the real 15/18 graph), and
+integration tests against the real 15/18 graph),
 41 Phase 6 telemetry tests (15 Prometheus-parser + 9 health-parser pure
 unit tests, 12 transactional service tests, 5 HTTP/API tests with a fake
-source — no live collector). Docker Desktop must be
+source — no live collector), and
+36 Phase 7 risk tests (24 pure rule-unit tests + 14 HTTP/API tests against
+the real 15/18 graph — no live services). Docker Desktop must be
 running; the developer's local database is never touched by tests.
 
 ## 5. How to start the backend
@@ -483,3 +485,34 @@ Notes and limits:
 - Localhost-only like the sync trigger: the endpoint refuses non-loopback
   peers with 403. Do not expose it beyond the machine without the
   deferred auth story.
+
+## 13. Change-risk assessment (Phase 7)
+
+Read-only classification over the impact traversal plus runtime metadata
+(control plane running per §5, twin synced per §10 and observed per §12 —
+tests use Testcontainers instead):
+
+```powershell
+# Ordinal risk levels with reasons for a table change:
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/twin/risk?from=target-table:inventory_db.inventory_items" |
+  Select-Object -ExpandProperty risks | Select-Object externalRef, level, uncertain, stale
+# -> depth-1 rows MEDIUM, deeper rows LOW on a fresh healthy graph; DOWN or
+#    recorded failures raise toward HIGH; services without runtime UNKNOWN.
+```
+
+Notes and limits:
+
+- Same `from` (1–10 UUID/external-ref), `maxDepth` (1–10, default 6),
+  and `includeTypes` conventions as §11; blank/oversized input fails 400,
+  unknown identifiers 404. One `@Transactional(readOnly=true)` unit: entity
+  and relationship counts are identical before and after every query
+  (asserted in tests). No migration, no writes, no new dependencies.
+- Taxonomy `risk-v1` (see `RiskTaxonomy`): depth base, 5+ evidence-path
+  fan-out, service health, cumulative failure counters (never rates, never
+  incident proof; zero never lowers), 30-minute freshness (exactly 30m is
+  fresh; older is stale with severe signals retained). Only services carry
+  runtime, so only services receive runtime reasoning.
+- Every entry carries sorted reasons plus `uncertain`/`stale` flags.
+  Advisory only: potentially affected is not confirmed breakage, and the
+  result never authorizes an action. Read-only GET at the same trust level
+  as the impact endpoint; do not expose beyond the machine without auth.

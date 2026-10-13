@@ -194,6 +194,17 @@ itself a place data can leak. The following holds for the current pipeline
   health-by-absence inference (T3). Runtime facts are advisory
   observations with an advancing `observedAt`, never authorization (T4–
   T6) and never a substitute for audit records (T7, still planned).
+- **Phase 7 risk assessment (2026-10-14): classification, same trust
+  level as the impact GET.** `GET /api/v1/twin/risk` performs no
+  mutation, execution, filesystem scanning, or external calls — one
+  read-only transaction reusing the impact traversal (counts unchanged
+  after queries, asserted in tests). Ordinal levels with sorted reasons
+  replace any numeric-score temptation: there is no probability to
+  misread, and `UNKNOWN`/stale entries force caution instead of
+  permitting action (T1/T3). The taxonomy version travels in the
+  response so future policy work can pin exactly what it consumed. Like
+  the impact endpoint, local-development-only until the deferred auth
+  story lands (see §3: still open).
 
 ## 3. Out-of-scope today, in-scope for design
 

@@ -3,7 +3,7 @@
 Record of binding decisions taken at project foundation (2026-09-28) and
 extended in Phase 1 and Phase 2A (2026-09-29), Phase 2B and Phase 3A (2026-09-30),
 Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), Phase 5 (2026-10-10),
-and Phase 6 (2026-10-13).
+and Phase 6 (2026-10-13), and Phase 7 (2026-10-14).
 Status labels: **decided** (binding now) / **planned** (intent, not yet implemented).
 
 ## D1. Java 21 — decided
@@ -487,6 +487,40 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   authentication stays open and still gates any non-local exposure.
 - **State:** Implemented and tested (41 new tests, dependency-free
   parsers). Live verification pending (see `PROJECT_STATUS.md`).
+
+## D25. Deterministic ordinal change-risk assessment — decided (2026-10-14)
+
+- **Decision:** The second `intelligence` module is a read-only
+  deterministic risk classification over one Phase 5 impact traversal
+  plus Phase 6 runtime metadata (`intelligence` package only):
+  `GET /api/v1/twin/risk` reuses the impact service for traversal and
+  validation (same `from` 1–10, `maxDepth` 1–10 default 6,
+  `includeTypes`, 400/404 conventions) and classifies the impacted set in
+  one `@Transactional(readOnly=true)` unit. No BFS duplication, no new
+  dependencies, no migration, no writes.
+- **Taxonomy `risk-v1` (documented in `RiskTaxonomy`, no numeric scores
+  anywhere):** depth 1 starts `MEDIUM`, depth 2+ starts `LOW`; five or
+  more independent evidence paths raise one step (calibrated so routine
+  triangle/diamond alternatives on the Phase 4 graph do not inflate);
+  reported `DOWN`/`OUT_OF_SERVICE` sets `HIGH`; cumulative failure
+  families (`.failure`/`.rejected`/`.declined` above zero) raise one
+  step as lifetime evidence, never rates or incident proof; zero and
+  success counters never lower. A `SERVICE` without `runtime` metadata
+  is `UNKNOWN`; metadata older than 30 minutes is stale (boundary-tested:
+  exactly 30m is fresh) — stale severe signals are retained while flagged
+  `stale` + `uncertain`, so missing or stale evidence never reads safer.
+  Only services carry runtime, so only services receive
+  health/counter/freshness reasoning; tables/databases/APIs are assessed
+  structurally, stated in the response note.
+- **Rationale:** Impact paths say what is reachable; runtime facts say
+  what was last observed. The classification joins them with the smallest
+  explainable rule set (ordinal levels, sorted reasons, explicit flags)
+  so a later policy story has a reviewable input instead of a black-box
+  score. Same trust posture as the impact GET (read-only, local-only,
+  no new auth); the result is advisory and never authorization (T4/T5).
+- **State:** Implemented and tested (36 new tests: 22 pure rule-unit +
+  14 HTTP/API integration tests against the real 15/18 graph). Live
+  verification pending (see `PROJECT_STATUS.md`).
 
 ## Supersession rule
 

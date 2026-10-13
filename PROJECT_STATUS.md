@@ -1,13 +1,54 @@
 # Systivex Project Status
 
-Last verified: **2026-10-13** (Asia/Kolkata). This document must be updated
+Last verified: **2026-10-14** (Asia/Kolkata). This document must be updated
 whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 6 — Deterministic twin telemetry ingestion (implemented 2026-10-13;
-automated tests green, live verification pending).** Phases 0–5 below
+**Phase 7 — Deterministic change-risk assessment (implemented 2026-10-14;
+automated tests green, live verification pending).** Phases 0–6 below
 are kept as history.
+
+## What is complete (Phase 7, 2026-10-14 — implementation + automated tests complete)
+
+- [x] Risk classification in the control-plane `intelligence` package (no new
+      package): `RiskLevel` (`LOW`/`MEDIUM`/`HIGH`/`UNKNOWN`), `RiskTaxonomy`
+      (versioned `risk-v1`: depth base, 5+ path fan-out, health, cumulative
+      failure families, 30-minute freshness — documented limits included),
+      `RiskService` (pure classification core + read-only orchestration over
+      the existing impact service), `RiskController`
+      (`GET /api/v1/twin/risk`, same validation conventions as impact),
+      `RiskResponse` (per-entry level, sorted reasons, `uncertain`/`stale`
+      flags, taxonomy version, advisory note). No traversal duplication, no
+      new dependencies, no migration, no writes.
+- [x] Grounding rules: depth 1 → `MEDIUM`, depth 2+ → `LOW`; 5+ evidence
+      paths raise one step (routine 3–4 path alternatives do not inflate);
+      `DOWN`/`OUT_OF_SERVICE` → `HIGH`; failure counters above zero raise
+      one step as lifetime evidence (never rates, never incident proof);
+      zero/success counters never lower. Services without runtime →
+      `UNKNOWN`; stale severe signals retained with `stale`+`uncertain`
+      flags. Only services receive runtime reasoning (tables/databases/APIs
+      structural). No numeric scores anywhere.
+- [x] Tests: 38 new, 0 failures (`RiskServiceTest` 24 pure rule-unit tests —
+      every branch, both freshness boundaries, uncertainty, reason ordering,
+      no-false-precision; `RiskApiTest` 14 HTTP/API integration tests —
+      real 15/18 graph, DOWN/HIGH, failure raise, stale retention, UNKNOWN
+      on missing runtime, ordering, determinism, 400/404, leakage,
+      read-only proof, impact stability); `package -DskipTests` builds.
+      `backend/target-services/` and `observability/` untouched (verified
+      via `git status`).
+- [ ] LIVE VERIFICATION (pending): control-plane boot + sync + observations +
+      risk queries against local PostgreSQL 18 and live target services not
+      observed in this phase (no credential use, no service restarts,
+      nothing claimed beyond automated tests). Verdict: READY FOR REVIEW —
+      implementation + automated tests complete.
+- [ ] STILL DEFERRED: Tempo, twin trace/log presence signals, unified trace/log UI,
+      agents, simulation/policy/execution/verification, Redis, brokers,
+      K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
+      broad authentication (Milestone 2C item 2 still open), column-level
+      lineage, READS inference, pagination beyond response limits.
+
+## What is complete (Phase 5, 2026-10-10 — implementation + automated tests complete)
 
 ## What is complete (Phase 5, 2026-10-10 — implementation + automated tests complete)
 
@@ -802,6 +843,9 @@ Phase 0 record (2026-09-28) is retained below for history.
    contract (Phase 3A/3B-1/3B-2) into twin rows~~ DONE (Phase 6, above —
    health + six allowlisted counters only, still without agents or
    execution; trace/log presence remains deferred).
+5. ~~Deterministic change-risk assessment over impact paths + runtime
+   facts~~ DONE (Phase 7, above — ordinal levels with reasons and
+   uncertainty flags, advisory only; no policy/execution).
 
 Out of scope: agents, simulation, approvals UI, brokers, K8s,
 vector search, frontend beyond API consumption readiness. Cross-database
