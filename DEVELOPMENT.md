@@ -121,13 +121,16 @@ $env:Path="C:\Program Files\Java\jdk-21.0.10\bin;" + $env:Path
 ./mvnw test
 ```
 
-Expected (verified 2026-10-10): `Tests run: 88, Failures: 0, Errors: 0` —
+Expected (verified 2026-10-13): `Tests run: 131, Failures: 0, Errors: 0` —
 service unit tests plus Testcontainers-backed migration, repository, and API
 integration tests, 2 observability tests (tracing active, health UP),
 20 Phase 4 observation tests (scanner mapping/fail-closed, sync
-idempotency/ownership/rollback, HTTP trigger, loopback guard), and
+idempotency/ownership/rollback, HTTP trigger, loopback guard),
 37 Phase 5 impact tests (18 deterministic BFS unit tests + 19 HTTP/API
-integration tests against the real 15/18 graph). Docker Desktop must be
+integration tests against the real 15/18 graph), and
+41 Phase 6 telemetry tests (15 Prometheus-parser + 9 health-parser pure
+unit tests, 12 transactional service tests, 5 HTTP/API tests with a fake
+source — no live collector). Docker Desktop must be
 running; the developer's local database is never touched by tests.
 
 ## 5. How to start the backend
@@ -443,3 +446,40 @@ Notes and limits:
 - `snapshotObservedAt` is the observation timestamp of the call, not a
   graph revision. Same input over an unchanged graph returns identically
   ordered results (starts, adjacency, impacted, and paths are all sorted).
+
+## 12. Runtime observation (Phase 6)
+
+Pull-based health/counter annotation over the synced twin graph (control
+plane running per §5, twin synced per §10, target services running for
+live evidence — tests use fixtures instead):
+
+```powershell
+# Annotate matched target-service:* rows with validated runtime facts:
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/twin/observations" -Method Post `
+  -ContentType "application/json" -Body '{}' | ConvertTo-Json -Depth 10
+# -> {"observedAt":"...","servicesProcessed":4,"factsUpdated":4,"factsUnchanged":0,...}
+# Re-polling with identical counters reports factsUpdated:0 while observedAt advances.
+```
+
+Notes and limits:
+
+- Ingests only the pinned contract: Actuator health status plus the six
+  tag-free business counters (`checkout.success/failure`,
+  `inventory.reservation.success/rejected`,
+  `payment.authorization.success/declined`; gateway health only).
+  Collection targets come from twin metadata on `127.0.0.1` — the request
+  carries no URLs. No schedulers, watchers, bulk log import, or raw trace
+  storage; trace/log presence is not collected (no privacy-safe source).
+- Absent counter families stay absent (never zero-filled); unreachable
+  services are recorded per-service as unavailable with limitations. A run
+  where nothing was reachable returns zero updates plus explicit
+  limitations — never a success claim.
+- Validation is fail-closed before any write: unknown business families,
+  labels on allowlisted counters, oversized/malformed payloads, and
+  privacy-sensitive content abort the run (400/409) with full rollback.
+  One transaction per run; only the namespaced `runtime` metadata key is
+  written (manual rows, other keys, and all relationships untouched).
+  Phase 4 re-syncs preserve `runtime`; Phase 5 impact semantics unchanged.
+- Localhost-only like the sync trigger: the endpoint refuses non-loopback
+  peers with 403. Do not expose it beyond the machine without the
+  deferred auth story.

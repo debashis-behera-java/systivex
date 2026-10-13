@@ -1,12 +1,12 @@
 # Systivex Project Status
 
-Last verified: **2026-10-10** (Asia/Kolkata). This document must be updated
+Last verified: **2026-10-13** (Asia/Kolkata). This document must be updated
 whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 5 — Deterministic change-impact analysis (implemented 2026-10-10;
-automated tests green, live verification pending).** Phases 0–4 below
+**Phase 6 — Deterministic twin telemetry ingestion (implemented 2026-10-13;
+automated tests green, live verification pending).** Phases 0–5 below
 are kept as history.
 
 ## What is complete (Phase 5, 2026-10-10 — implementation + automated tests complete)
@@ -63,6 +63,57 @@ are kept as history.
       automated tests). Verdict: READY FOR REVIEW — implementation +
       automated tests complete.
 - [ ] STILL DEFERRED: Tempo, twin telemetry ingestion, unified trace/log UI,
+      agents, simulation/risk/policy/execution/verification, Redis, brokers,
+      K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
+      broad authentication (Milestone 2C item 2 still open), column-level
+      lineage, READS inference, pagination beyond response limits.
+
+## What is complete (Phase 6, 2026-10-13 — implementation + automated tests complete)
+
+- [x] `telemetry` package in the control plane (new, only addition):
+      `PrometheusCounterParser` + `HealthParser` (pure, bounded,
+      dependency-free), `AllowedCounters` (six-family allowlist pinned to
+      the instrumented contract), `TelemetrySource` + `RestTelemetrySource`
+      (loopback-only pull, short timeouts), `TelemetryObservationService`
+      (collect → validate → one-transaction annotate),
+      `ObservationController` (`POST /api/v1/twin/observations`, `{}` default,
+      no caller URLs, loopback guard), `ObservationReceipt` /
+      `ServiceObservation` (bounded receipt, no run-history table),
+      `ObservationForbiddenException` (403). No new dependencies, no migration.
+- [x] Ingestion contract: health status (`UP`/`DOWN`/`OUT_OF_SERVICE`/
+      `UNKNOWN`) plus exactly the six tag-free business counters —
+      `checkout.success/failure`, `inventory.reservation.success/rejected`,
+      `payment.authorization.success/declined` (gateway health only).
+      Absent families reported as absent with limitations, never zero-filled.
+      Unknown business families, labels on allowlisted counters, oversized
+      payloads, malformed values, and privacy-sensitive content fail the run
+      400 with full rollback before any write.
+- [x] Availability semantics: unreachable services recorded per-service as
+      unavailable with limitations; an all-unreachable run returns zero
+      updates plus explicit limitations, never a success claim. Health never
+      inferred, outcomes never borrowed across services. Trace/log presence
+      deliberately not collected (no privacy-safe source without bulk
+      import) — carried as a receipt limitation.
+- [x] Idempotency/timestamp contract: `observedAt` always advances and stored
+      timestamps advance with it; `factsUpdated` vs `factsUnchanged`
+      distinguish changed facts from timestamp refreshes. Repeat polls with
+      identical counters report zero updates and still prove re-observation.
+- [x] Composition: only the namespaced `runtime` metadata key of matched
+      `target-service:*` rows is written; manual rows, other keys, and all
+      relationships untouched. Phase 4 sync preserves `runtime` across
+      re-syncs (idempotency counts hold). Phase 5 impact shape and
+      reachability verified unchanged after observation.
+- [x] Tests: 41 new, 0 failures (`PrometheusCounterParserTest` 15,
+      `HealthParserTest` 9, `TelemetryObservationServiceTest` 12,
+      `ObservationApiTest` 5 — fixtures only, no live collector);
+      `package -DskipTests` builds. `backend/target-services/` and
+      `observability/` untouched (verified via `git status`).
+- [ ] LIVE VERIFICATION (pending): control-plane boot + sync + observations
+      against local PostgreSQL 18 and live target services not observed in
+      this phase (no credential use, no service restarts, nothing claimed
+      beyond automated tests). Verdict: READY FOR REVIEW — implementation +
+      automated tests complete.
+- [ ] STILL DEFERRED: Tempo, twin trace/log presence signals, unified trace/log UI,
       agents, simulation/risk/policy/execution/verification, Redis, brokers,
       K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
       broad authentication (Milestone 2C item 2 still open), column-level
@@ -745,11 +796,12 @@ Phase 0 record (2026-09-28) is retained below for history.
    (Phase 5, above — impact paths only, no simulation/risk/policy).
 3. Authentication on any API before the surface leaves the local machine
    (still open — the Phase 4 loopback bind + guard is a development
-   boundary, not auth; Phase 5 adds no new auth but documents the
-   effective-bind caveat in D23).
-4. Twin telemetry ingestion: consume the observed metrics/traces/logs
-   contract (Phase 3A/3B-1/3B-2) into twin rows — still without agents or
-   execution.
+   boundary, not auth; Phases 5–6 add no new auth but document the
+   effective-bind caveat in D23/D24).
+4. ~~Twin telemetry ingestion: consume the observed health/counter
+   contract (Phase 3A/3B-1/3B-2) into twin rows~~ DONE (Phase 6, above —
+   health + six allowlisted counters only, still without agents or
+   execution; trace/log presence remains deferred).
 
 Out of scope: agents, simulation, approvals UI, brokers, K8s,
 vector search, frontend beyond API consumption readiness. Cross-database

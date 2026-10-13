@@ -70,7 +70,22 @@ public class TwinSyncService {
                     existing.setType(spec.type());
                     existing.setName(spec.name());
                     existing.setEnvironment(spec.environment());
-                    existing.setMetadata(new HashMap<>(spec.metadata()));
+                    // Phase 6 runtime annotations live under a namespaced key
+                    // and survive structural re-syncs; they are never part of
+                    // the repository-connector fact set.
+                    Map<String, Object> merged = new HashMap<>(spec.metadata());
+                    Object runtime =
+                            existing.getMetadata() == null
+                                    ? null
+                                    : existing.getMetadata().get(
+                                            com.soubhagya.systivex.telemetry.TelemetryConnector
+                                                    .RUNTIME_KEY);
+                    if (runtime != null) {
+                        merged.put(
+                                com.soubhagya.systivex.telemetry.TelemetryConnector.RUNTIME_KEY,
+                                runtime);
+                    }
+                    existing.setMetadata(merged);
                     entities.save(existing);
                     byRef.put(spec.externalRef(), existing);
                     entitiesUpdated++;
@@ -119,9 +134,15 @@ public class TwinSyncService {
     }
 
     private static boolean isSame(SystemEntity existing, DiscoveredEntity spec) {
+        // Runtime annotations are excluded: a re-sync over unchanged
+        // repository facts reports unchanged even when Phase 6 observations
+        // have annotated the row since the last sync.
+        Map<String, Object> stored =
+                existing.getMetadata() == null ? Map.of() : new HashMap<>(existing.getMetadata());
+        stored.remove(com.soubhagya.systivex.telemetry.TelemetryConnector.RUNTIME_KEY);
         return existing.getType() == spec.type()
                 && Objects.equals(existing.getName(), spec.name())
                 && Objects.equals(existing.getEnvironment(), spec.environment())
-                && Objects.equals(existing.getMetadata(), spec.metadata());
+                && Objects.equals(stored, spec.metadata());
     }
 }

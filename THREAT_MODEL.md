@@ -169,14 +169,31 @@ itself a place data can leak. The following holds for the current pipeline
   **Binding caveat (evidence, not assumption):** the tracked example binds
   `127.0.0.1`, but a pre-existing live `application.properties` does not
   inherit it — verified 2026-10-10 that the live file carries no
-  `server.address` line — so the effective bind is the framework default
-  unless `SERVER_ADDRESS=127.0.0.1` is set or the live file is given the
-  bind (see `DECISIONS.md` D23, `DEVELOPMENT.md` §10–§11). Impact results
-  are advisory reachability ("potentially affected", per-path evidence
-  included), never authorization or fact about the live system (T1/T3):
-  over-approximation (`WRITES` is per-database, no `READS` edges) and
-  staleness (`snapshotObservedAt` is an observation timestamp, not a
-  revision) must block consequential use, not permit it.
+   `server.address` line — so the effective bind is the framework default
+   unless `SERVER_ADDRESS=127.0.0.1` is set or the live file is given the
+   bind (see `DECISIONS.md` D23, `DEVELOPMENT.md` §10–§11). Impact results
+   are advisory reachability ("potentially affected", per-path evidence
+   included), never authorization or fact about the live system (T1/T3):
+   over-approximation (`WRITES` is per-database, no `READS` edges) and
+   staleness (`snapshotObservedAt` is an observation timestamp, not a
+   revision) must block consequential use, not permit it.
+- **Phase 6 runtime observation (2026-10-13): annotation, same trust
+  level as the sync trigger.** `POST /api/v1/twin/observations` writes
+  only the namespaced `runtime` metadata key of matched
+  `target-service:*` rows — one transaction, full rollback on any
+  validation/identity failure — and refuses non-loopback peers with 403
+  like the sync endpoint (no new auth infrastructure; exposure beyond
+  the machine still requires the deferred auth story). Collection pulls
+  from `127.0.0.1` ports already in twin metadata; the request carries
+  no URLs, so there is no caller-controlled fetch target. Ingestion is
+  allowlist-only (health status + six tag-free counters); raw bodies,
+  labels, and all other families are never stored, and unknown
+  business-flavoured families or privacy-sensitive content abort the run
+  instead of entering the twin. Absent counters and unreachable services
+  are recorded as limitations with no zero-fill and no
+  health-by-absence inference (T3). Runtime facts are advisory
+  observations with an advancing `observedAt`, never authorization (T4–
+  T6) and never a substitute for audit records (T7, still planned).
 
 ## 3. Out-of-scope today, in-scope for design
 

@@ -100,11 +100,25 @@ consequential actions through explicit control-plane authorization.
   `127.0.0.1`, but a pre-existing live `application.properties` does not
   inherit it — run with `SERVER_ADDRESS=127.0.0.1` (or add the bind to the
   live file) to keep the local boundary; see `DECISIONS.md` D23 and
-  `THREAT_MODEL.md` §3a.
+   `THREAT_MODEL.md` §3a.
+- Phase 6 runtime observation (implemented 2026-10-13, live verification
+  pending): the first `telemetry` module (`backend/.../telemetry/`)
+  pulls loopback Actuator health plus the six allowlisted tag-free
+  business counters into a namespaced `runtime` metadata key on the
+  matched `target-service:*` rows via an explicit
+  `POST /api/v1/twin/observations` trigger (`{}` default, no caller URLs,
+  403 off loopback). Dependency-free deterministic parsers fail closed on
+  unknown families, labels, oversize/malformed payloads, and
+  privacy-sensitive content; absent counters and unreachable services are
+  recorded as limitations, never inferred; repeat polls report
+  updated-vs-unchanged facts while the observation timestamp always
+  advances. One transaction per run, no migration, no new dependencies.
+  Trace/log presence deliberately not collected (no privacy-safe source).
+  41 new tests green. See `DECISIONS.md` D24.
 
 **Not yet implemented** (planned architecture only):
 
-- Twin telemetry ingestion (metrics/traces/logs into the twin),
+- Twin trace/log presence signals (health/counter annotation is Phase 6),
   Git integration
 - Agent orchestration, tooling, evidence model
 - Policy / risk / approval engine and controlled execution, simulation
@@ -129,7 +143,9 @@ Systivex/
 │       ├── main/java/com/soubhagya/systivex/
 │       │   ├── SystivexApplication.java
 │       │   ├── twin/{model,repository,service,api}/
-│       │   └── observation/           # Phase 4: read-only repo connector + POST /api/v1/twin/sync
+│       │   ├── observation/           # Phase 4: read-only repo connector + POST /api/v1/twin/sync
+│       │   └── intelligence/          # Phase 5: read-only impact BFS + GET /api/v1/twin/impact
+│       │   └── telemetry/             # Phase 6: pull-based runtime annotation + POST /api/v1/twin/observations
 │       ├── main/resources/application.properties          # LOCAL ONLY, git-ignored
 │       ├── main/resources/application.example.properties  # tracked safe template
 │       ├── main/resources/db/migration/V1__create_system_twin.sql

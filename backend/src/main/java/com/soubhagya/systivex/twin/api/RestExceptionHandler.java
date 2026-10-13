@@ -2,6 +2,7 @@ package com.soubhagya.systivex.twin.api;
 
 import com.soubhagya.systivex.observation.OwnershipConflictException;
 import com.soubhagya.systivex.observation.SyncForbiddenException;
+import com.soubhagya.systivex.telemetry.ObservationForbiddenException;
 import com.soubhagya.systivex.twin.service.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
@@ -89,6 +90,18 @@ public class RestExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleSyncForbidden(
             SyncForbiddenException ex, HttpServletRequest request) {
+        return ErrorResponse.of(
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null);
+    }
+
+    @ExceptionHandler(ObservationForbiddenException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleObservationForbidden(
+            ObservationForbiddenException ex, HttpServletRequest request) {
         return ErrorResponse.of(
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),

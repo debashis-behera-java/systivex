@@ -2,7 +2,8 @@
 
 Record of binding decisions taken at project foundation (2026-09-28) and
 extended in Phase 1 and Phase 2A (2026-09-29), Phase 2B and Phase 3A (2026-09-30),
-Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), and Phase 5 (2026-10-10).
+Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), Phase 5 (2026-10-10),
+and Phase 6 (2026-10-13).
 Status labels: **decided** (binding now) / **planned** (intent, not yet implemented).
 
 ## D1. Java 21 — decided
@@ -438,6 +439,54 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   non-local exposure.
 - **State:** Implemented and tested (37 new tests, 88 green total, build
   succeeds). Live verification pending (see `PROJECT_STATUS.md`).
+
+## D24. Pull-based twin telemetry ingestion with strict allowlist — decided (2026-10-13)
+
+- **Decision:** The second twin ingestion is a pull-based telemetry
+  connector (`telemetry` package, control plane only): an explicit
+  `POST /api/v1/twin/observations` trigger (default body `{}`, no
+  caller-supplied URLs) pulls Actuator health and Prometheus exposition
+  from `127.0.0.1` ports already recorded in twin metadata, validates
+  every payload through dependency-free deterministic parsers, and
+  annotates only the matched connector-managed `target-service:*`
+  entities under a namespaced `runtime` metadata key
+  (`managedBy: telemetry-connector`, `phase6-v1`). No schedulers,
+  watchers, bulk log import, raw trace storage, new entity types, new
+  migrations, or new dependencies.
+- **Allowlist (pinned to the instrumented contract, verified against the
+  target-service sources):** service health status (`UP`/`DOWN`/
+  `OUT_OF_SERVICE`/`UNKNOWN`) plus exactly six tag-free business counter
+  families — `checkout.success/failure` (order),
+  `inventory.reservation.success/rejected` (inventory),
+  `payment.authorization.success/declined` (payment); gateway-service has
+  no business counters (health only). Absent families are reported as
+  absent with a limitation — never inferred as zero. Unknown
+  business-flavoured families, any labels on allowlisted counters,
+  unbounded payloads, malformed values, and privacy-sensitive content
+  (credentials, tokens, CUST-/SKU- identifiers) fail the whole run with
+  400/409 and full rollback before any write.
+- **Availability vs. validity:** unreachable services are missing
+  evidence, not malformed evidence — recorded per-service as unavailable
+  with limitations (a run where nothing was reachable returns zero
+  updates plus explicit limitations, never a success claim). Health is
+  never inferred from missing telemetry and outcomes never from unrelated
+  counters. Trace/log presence is deliberately not collected: no existing
+  source offers a privacy-safe presence signal without bulk import, so
+  the receipt carries that limitation instead of fabricated evidence.
+- **Idempotency/timestamp contract:** `observedAt` always advances and
+  stored timestamps advance with it (staleness can never be hidden);
+  `factsUpdated` counts services whose health/counters differed while
+  `factsUnchanged` counts identical-fact re-observations. A repeat poll
+  with identical counters reports zero updates and still proves a fresh
+  observation.
+- **Composition:** Phase 4 sync preserves the `runtime` key across
+  re-syncs (excluded from its same-check, so idempotency counts hold);
+  telemetry never writes relationships, so Phase 5 impact shape and
+  reachability are unchanged. Same localhost boundary as D22
+  (`LoopbackGuard`, 403 off loopback, no new auth). Broad
+  authentication stays open and still gates any non-local exposure.
+- **State:** Implemented and tested (41 new tests, dependency-free
+  parsers). Live verification pending (see `PROJECT_STATUS.md`).
 
 ## Supersession rule
 
