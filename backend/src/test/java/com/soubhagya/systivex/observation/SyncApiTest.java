@@ -2,6 +2,7 @@ package com.soubhagya.systivex.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.soubhagya.systivex.security.TestJwt;
 import com.soubhagya.systivex.twin.AbstractPostgresIntegrationTest;
 import com.soubhagya.systivex.twin.api.SystemEntityResponse;
 import com.soubhagya.systivex.twin.api.SystemRelationshipResponse;
@@ -103,9 +104,13 @@ class SyncApiTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void syncOffLoopbackIsForbidden() throws Exception {
+        // Valid operator token: authentication and role checks pass, so the
+        // 403 proves the loopback guard stays authoritative behind auth.
+        String operatorToken = TestJwt.token(java.util.List.of("TWIN_OPERATOR"));
         mockMvc.perform(
                         post("/api/v1/twin/sync")
                                 .contentType(MediaType.APPLICATION_JSON)
+                                .header("Authorization", "Bearer " + operatorToken)
                                 .content("{}")
                                 .with(request -> {
                                     request.setRemoteAddr("203.0.113.9");

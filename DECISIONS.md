@@ -616,6 +616,53 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   green without Docker; HTTP integration suite added for Docker
   environments). Live verification pending (see `PROJECT_STATUS.md`).
 
+## D28. Control-plane JWT authentication and role authorization — decided (2026-10-15)
+
+- **Decision:** The control plane is an OAuth2 resource server with JWT
+  bearer tokens only (`spring-boot-starter-security` +
+  `spring-boot-starter-oauth2-resource-server`; no Basic auth, no local
+  password database, no home-grown tokens, no invented production IdP).
+  Configuration lives under `systivex.security.jwt.*` (`enabled`,
+  `issuer-uri`, `jwk-set-uri`, `accepted-audience`, `role-claim`,
+  `clock-skew-seconds`, `allowed-roles`) with defaults `roles` /
+  `systivex` / 60s skew / `TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN`.
+- **Fail-closed contract:** the trusted `issuer-uri` (HTTP(S) URL) is
+  mandatory whenever JWT security is enabled; `enabled=false` is rejected
+  at startup, so no security-off fallback exists. A custom `jwk-set-uri`
+  only overrides key discovery — issuer, audience, signature, expiry, and
+  `nbf` are always validated (with clock skew). Missing/invalid
+  configuration fails fast instead of serving an unauthenticated API.
+- **Role mapping (allowlist-only):** only `allowed-roles` values from the
+  configured claim become `ROLE_*` authorities; malformed claims grant
+  nothing and unknown values never grant access. `TWIN_ADMIN` inherits
+  `TWIN_READ`, `TWIN_ANALYZE`, and `TWIN_OPERATOR`. Authenticated without
+  the required role is 403; missing/invalid bearer credentials are 401
+  with fixed safe messages (never tokens, headers, secrets, or claims).
+- **Endpoint policy:** twin/impact/risk GETs need `TWIN_READ`; twin POSTs
+  need `TWIN_ADMIN`; simulations/policy-evaluations need `TWIN_ANALYZE`;
+  sync and observations need `TWIN_OPERATOR` with the existing
+  `LoopbackGuard` still authoritative (a valid operator token never
+  bypasses it). `GET /actuator/health` stays anonymous with details hidden
+  (`show-details=never`); `/actuator/prometheus` needs `TWIN_READ`
+  (monitoring access policy: read role only); all other actuator paths and
+  everything else are denied. Stateless sessions, CSRF disabled for this
+  token-only API, no CORS rules.
+- **Out of scope:** approvals, execution endpoints, audit-ledger
+  persistence, migrations, and target-service authentication are
+  explicitly not introduced here. Simulation/policy stays read-only and
+  advisory — an advisory ALLOW never becomes authorization to execute.
+- **Verification:** automated JWT tests use locally generated test signing
+  keys only (never production credentials). Live authentication against a
+  genuine identity provider is NOT verified in this phase — no trusted
+  issuer is configured in this environment — and must not be claimed.
+- **Rationale:** Milestone 2C item 2 (broad authentication) has been open
+  since Phase 4 with only a loopback bind + guard as a development
+  boundary. JWT resource-server validation closes that gap for the control
+  plane with the smallest reviewable mechanism, while target-service APIs
+  stay local-only and unchanged.
+- **State:** Implemented and tested (see `PROJECT_STATUS.md` Phase 10).
+  Live IdP verification pending a configured trusted issuer.
+
 ## Supersession rule
 
 New decisions amend this file with date and rationale; they never silently edit

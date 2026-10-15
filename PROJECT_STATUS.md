@@ -5,9 +5,67 @@ whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 9 — Advisory policy evaluation (implemented 2026-10-15;
-automated unit tests green; integration tests require Docker; live
-verification pending).** Phases 0–8 below are kept as history.
+**Phase 10 — Control-plane authentication & authorization (implemented
+2026-10-15; automated tests green; live IdP verification pending — no
+trusted issuer configured).** Phases 0–9 below are kept as history.
+
+## What is complete (Phase 10, 2026-10-15 — implementation + automated tests complete)
+
+- [x] OAuth2 resource-server JWT authentication on the control plane (no
+      Basic auth, no local passwords, no home-grown tokens, no invented
+      production IdP): `spring-boot-starter-security` +
+      `spring-boot-starter-oauth2-resource-server` with validated
+      `systivex.security.jwt.*` configuration (issuer mandatory and
+      fail-closed, `enabled=false` rejected, custom JWK Set URL never
+      disables issuer validation, audience/signature/expiry/`nbf` always
+      checked). Allowlist-only role mapping from the `roles` claim with
+      `TWIN_ADMIN` inheriting READ/ANALYZE/OPERATOR; malformed claims
+      grant nothing, unknown values never grant access (see `DECISIONS.md`
+      D28).
+- [x] Endpoint policy: twin/impact/risk GETs `TWIN_READ`; twin POSTs
+      `TWIN_ADMIN`; simulations/policy-evaluations `TWIN_ANALYZE`; sync
+      and observations `TWIN_OPERATOR` with the existing loopback guards
+      still authoritative (valid operator tokens off loopback stay 403);
+      `GET /actuator/health` anonymous with details hidden
+      (`show-details=never`); `/actuator/prometheus` requires `TWIN_READ`;
+      all other actuator paths and everything else denied. Stateless
+      bearer tokens, CSRF disabled for this token-only API, no CORS
+      rules. 401 on missing/invalid credentials, 403 on insufficient
+      authority; safe fixed-shape error bodies; no token/secret logging.
+      Existing 400/404/409 contracts preserved; simulation/policy stay
+      read-only and advisory (ALLOW never authorizes execution). No
+      approvals, execution endpoints, audit-ledger persistence,
+      migrations, or target-service authentication added.
+- [x] Tests: 31 new, 0 failures (`JwtGrantedAuthoritiesConverterTest` 6 —
+      allowlist mapping, unknown/malformed claims, admin inheritance;
+      `SystivexSecurityPropertiesTest` 8 — fail-closed issuer, no
+      security-off mode, value bounds; `SecurityAuthenticationApiTest` 8
+      — real HTTP valid/missing/malformed/expired/`nbf`/issuer/audience/
+      signature tokens, malformed+unknown roles, insufficient authority,
+      safe error bodies; `SecurityAuthorizationApiTest` 9 — per-endpoint
+      role matrix, admin inheritance, loopback preservation behind valid
+      tokens, actuator policy + deny-by-default, 400/404/409 regressions,
+      advisory wording). Existing API suites updated to authenticate
+      (shared `TestRestTemplate` bearer interceptor plus explicit tokens
+      in loopback tests); test signing keys only, never production
+      credentials. Every new/changed code file under 400 lines.
+      `backend/target-services/` and `observability/` untouched.
+- [ ] LIVE VERIFICATION (pending): no live authentication check was
+      executed in this phase — no trusted issuer is configured in this
+      environment (`SYSTIVEX_ISSUER_URI` unset), so the fail-closed
+      startup guard was not exercised against a genuine identity
+      provider and none is claimed. Automated JWT coverage (locally
+      generated test keys) must not be read as live IdP verification.
+      Phases 8–9 note: the repo holds no recorded live evidence beyond
+      their automated unit suites, so their live-verification status
+      stays pending (unchanged, not newly claimed here). Verdict: READY
+      FOR REVIEW — implementation + automated tests complete.
+- [ ] STILL DEFERRED: live IdP verification (needs a configured trusted
+      issuer), Tempo, twin trace/log presence signals, unified trace/log
+      UI, agents, approval workflow/execution/verification, Redis,
+      brokers, K8s, vectors, MCP, frontend, Git remotes, watchers,
+      schedulers, target-service authentication, column-level lineage,
+      READS inference, pagination beyond response limits.
 
 ## What is complete (Phase 9, 2026-10-15 — implementation + automated unit tests complete)
 
@@ -925,10 +983,11 @@ Phase 0 record (2026-09-28) is retained below for history.
    (Phase 4, above).
 2. ~~Deterministic read-only change-impact analysis over the twin graph~~ DONE
    (Phase 5, above — impact paths only, no simulation/risk/policy).
-3. Authentication on any API before the surface leaves the local machine
-   (still open — the Phase 4 loopback bind + guard is a development
-   boundary, not auth; Phases 5–6 add no new auth but document the
-   effective-bind caveat in D23/D24).
+3. ~~Authentication on any API before the surface leaves the local machine~~
+    DONE for the control plane (Phase 10, D28 — JWT resource server with
+    role policy; live IdP verification still pending a trusted issuer).
+    Target-service APIs remain open local-only endpoints (still gated by
+    the local-machine boundary, not by auth).
 4. ~~Twin telemetry ingestion: consume the observed health/counter
    contract (Phase 3A/3B-1/3B-2) into twin rows~~ DONE (Phase 6, above —
    health + six allowlisted counters only, still without agents or

@@ -242,14 +242,39 @@ itself a place data can leak. The following holds for the current pipeline
   stack traces — asserted in tests). Like the other intelligence
   endpoints, local-development-only until the deferred auth story lands
   (see §3: still open).
+- **Phase 10 control-plane authentication (2026-10-15): the deferred
+  auth story lands for the control plane.** All `/api/v1/twin/*`
+  endpoints and `/actuator/prometheus` now require JWT bearer tokens
+  from a configured trusted issuer (see `DECISIONS.md` D28): missing or
+  invalid credentials are 401, authenticated identities without the
+  required role are 403, and unknown/malformed role claims grant
+  nothing (`TWIN_ADMIN` inherits the three lesser roles). The sync and
+  observation loopback guards stay authoritative behind the
+  `TWIN_OPERATOR` role — a valid operator token from a non-loopback peer
+  is still refused, and `X-Forwarded-For` remains untrusted input.
+  `GET /actuator/health` stays anonymous but exposes status only
+  (`show-details=never`). Security error bodies are fixed safe messages
+  (no bearer tokens, headers, secrets, claims, or stack traces —
+  asserted in tests); nothing in the security path logs credentials.
+  Simulation and policy evaluation stay read-only and deterministic: an
+  advisory ALLOW is never authorization to execute a change (T4/T5), and
+  no approval, execution, audit-ledger, migration, or target-service
+  authentication surface is introduced here. Tests use locally generated
+  signing keys only — automated JWT coverage is NOT live identity
+  verification, and none is claimed without a configured trusted
+  issuer. The four target-service APIs remain open local-only endpoints
+  (unchanged by this phase) and must still not be exposed beyond the
+  machine.
 
 ## 3. Out-of-scope today, in-scope for design
 
-- Authentication/authorization mechanism (the twin API and all four target
-  service APIs are currently open — acceptable on a local machine, not
-  beyond it), secret management, key rotation. Each service's database
-  credential is a separate local secret; compromising one application user
-  yields that service's database only.
+- Control-plane authentication is implemented (Phase 10, D28); still
+  open: live identity-provider verification (no trusted issuer
+  configured here), secret management, key rotation, and any
+  authentication on the four target-service APIs (still open local-only
+  endpoints — acceptable on a local machine, not beyond it). Each
+  service's database credential remains a separate local secret;
+  compromising one application user yields that service's database only.
 - Twin-connector authentication and data-integrity guarantees.
 - Approval UX and delegation model; risk-classification taxonomy.
 - Execution sandboxing, blast-radius limits, rollback/verification loops.

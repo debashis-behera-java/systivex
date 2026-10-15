@@ -52,8 +52,10 @@ The control plane is a single Spring Boot deployment with strict module boundari
 The `twin` module exists in outline (`model`, `repository`, `service`, `api`
 packages) plus the Phase 4 `observation` package (scanner + sync, repository
 connector only), the Phase 5 `intelligence` package (read-only impact
-analysis only), and the Phase 6 `telemetry` package (pull-based runtime
-annotation only); the remaining target modules are **not yet created** — no placeholder
+analysis only), the Phase 6 `telemetry` package (pull-based runtime
+annotation only), the Phase 9 `policy` package (advisory evaluation only),
+and the Phase 10 `security` package (JWT resource server, role policy,
+fail-closed configuration); the remaining target modules are **not yet created** — no placeholder
 packages exist for them by decision:
 
 - `twin` — System Twin model and connectors (**model + persistence + minimal
@@ -232,7 +234,7 @@ business counters pulled from the loopback Actuator surface into a
 namespaced `runtime` metadata key (`telemetry` package,
 `POST /api/v1/twin/observations`; trace/log presence deliberately absent).
 No twin package beyond `twin` + `observation` + `intelligence` +
-`telemetry` + `policy`, no approval workflow or execution yet.
+`telemetry` + `policy` + `security`, no approval workflow or execution yet.
 
 ## 6. Trust boundaries
 
@@ -279,6 +281,13 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
   impact depth, path fan-out, service health, cumulative failure counters,
   and 30-minute freshness; read-only, advisory, never authorization —
   see `DECISIONS.md` D25);
+  authentication (Phase 10, see `DECISIONS.md` D28): the whole
+  `/api/v1/twin/*` surface requires JWT bearer tokens —
+  twin/impact/risk GETs `TWIN_READ`, twin POSTs `TWIN_ADMIN`,
+  simulations/policy-evaluations `TWIN_ANALYZE`, sync/observations
+  `TWIN_OPERATOR` (loopback guard still authoritative);
+  `GET /actuator/health` anonymous (status only),
+  `/actuator/prometheus` requires `TWIN_READ`, all else denied.
 - **SSE** for streaming long-running analysis/simulation progress (planned).
 - No WebSockets at this stage (see `DECISIONS.md`).
 
@@ -363,6 +372,15 @@ Implemented:
   codes, and explicit non-authorization wording (see `DECISIONS.md`
   D27). No persistence, no approval workflow, no execution, no new
   dependencies, no writes of any kind.
+- Control-plane authentication (Phase 10): OAuth2 JWT resource server in
+  the control plane (new `security` package); fail-closed
+  `systivex.security.jwt.*` configuration (trusted issuer mandatory, no
+  security-off mode); allowlist-only role mapping with `TWIN_ADMIN`
+  inheritance; per-endpoint role policy with loopback guards still
+  authoritative behind `TWIN_OPERATOR`; anonymous status-only health,
+  `TWIN_READ`-restricted Prometheus metrics, deny-by-default otherwise
+  (see `DECISIONS.md` D28). Automated JWT tests use local test keys
+  only — live IdP verification pending a configured trusted issuer.
 
 Why PostgreSQL + Flyway + a relational graph at this stage: the records the
 control plane will eventually authorize against (twin state, proposals,
@@ -378,8 +396,10 @@ Intentionally absent (not bugs — deferred by decision):
   above; read-only impact traversal is Phase 5, above; health/counter
   annotation is Phase 6, above; ordinal risk classification is Phase 7,
   above; hypothetical change simulation is Phase 8, above; advisory
-  policy evaluation is Phase 9, above).
-- Redis, Spring AI / Ollama, security, frontend.
+  policy evaluation is Phase 9, above; control-plane authentication is
+  Phase 10, above).
+- Redis, Spring AI / Ollama, frontend (control-plane security is done;
+  target-service authentication is still deferred).
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
   detection, any agent use of telemetry (later 3B slices and later).
 - Docker packaging of the Java services, Kafka / RabbitMQ / Kubernetes /

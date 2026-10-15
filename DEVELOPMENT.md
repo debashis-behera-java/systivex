@@ -67,8 +67,11 @@ Backend coordinates: `com.soubhagya:systivex:0.0.1-SNAPSHOT`.
 Active dependencies: `webmvc`, `validation`, `actuator`, `data-jpa`, `flyway`
 (+ `flyway-database-postgresql`, `postgresql` driver,
 `spring-boot-starter-opentelemetry`, `micrometer-registry-prometheus`,
-`opentelemetry-logback-appender-1.0` for the Phase 3B-2 Loki sink;
-test: `webmvc-test`, `restclient-test`, `testcontainers-postgresql`).
+`opentelemetry-logback-appender-1.0` for the Phase 3B-2 Loki sink,
+`spring-boot-starter-security` + `spring-boot-starter-oauth2-resource-server`
+for Phase 10 JWT authentication;
+test: `webmvc-test`, `restclient-test`, `testcontainers-postgresql`,
+`spring-security-test`).
 Phase 4 adds no dependencies.
 Do not add more without a recorded decision.
 
@@ -121,18 +124,22 @@ $env:Path="C:\Program Files\Java\jdk-21.0.10\bin;" + $env:Path
 ./mvnw test
 ```
 
-Expected (verified 2026-10-14): `Tests run: 169, Failures: 0, Errors: 0` —
-service unit tests plus Testcontainers-backed migration, repository, and API
-integration tests, 2 observability tests (tracing active, health UP),
+Expected (verified 2026-10-15): full suite green — service unit tests
+plus Testcontainers-backed migration, repository, and API integration
+tests, 2 observability tests (tracing active, health UP),
 20 Phase 4 observation tests (scanner mapping/fail-closed, sync
 idempotency/ownership/rollback, HTTP trigger, loopback guard),
 37 Phase 5 impact tests (18 deterministic BFS unit tests + 19 HTTP/API
 integration tests against the real 15/18 graph),
 41 Phase 6 telemetry tests (15 Prometheus-parser + 9 health-parser pure
 unit tests, 12 transactional service tests, 5 HTTP/API tests with a fake
-source — no live collector), and
+source — no live collector),
 36 Phase 7 risk tests (24 pure rule-unit tests + 14 HTTP/API tests against
-the real 15/18 graph — no live services). Docker Desktop must be
+the real 15/18 graph — no live services), Phase 8/9 simulation + policy
+unit suites and controller slices (Docker-gated HTTP suites included),
+and 31 Phase 10 security tests (role-mapping + fail-closed config unit
+tests plus real-HTTP JWT authentication/authorization tests with locally
+generated test keys — not live IdP verification). Docker Desktop must be
 running; the developer's local database is never touched by tests.
 
 ## 5. How to start the backend
@@ -157,9 +164,14 @@ Invoke-RestMethod -Uri "http://localhost:8080/actuator/health" | ConvertTo-Json
 ```
 
 Only `health` and `prometheus` actuator endpoints are exposed under
-`/actuator` (Phase 3A; previously health only).
+`/actuator` (Phase 3A; previously health only). Health is anonymous and
+exposes status only (`show-details=never`); Prometheus requires a
+`TWIN_READ` bearer token (Phase 10 monitoring policy); every other
+actuator path is denied.
 The twin API lives under `/api/v1/twin/entities` and
-`/api/v1/twin/relationships` (create/get/list, JSON, 400/404/409 on misuse).
+`/api/v1/twin/relationships` (create/get/list, JSON, 400/404/409 on misuse)
+— every call needs a JWT bearer token with the endpoint's role
+(see §16).
 
 ## 6. What is NOT needed yet
 
@@ -617,3 +629,39 @@ Notes and limits:
   evaluation, asserted in tests). No migration, no writes, no new
   dependencies, no configurable policy surface. Same trust level as the
   intelligence endpoints; do not expose beyond the machine without auth.
+
+## 16. Control-plane authentication (Phase 10)
+
+The control plane is an OAuth2 JWT resource server (see `DECISIONS.md`
+D28). Every `/api/v1/twin/*` call and `/actuator/prometheus` needs a
+`Authorization: Bearer <JWT>` header from the configured trusted issuer:
+
+| Endpoint | Required role |
+|---|---|
+| Twin/impact/risk GETs | `TWIN_READ` |
+| Twin entity/relationship POSTs | `TWIN_ADMIN` |
+| Simulations, policy-evaluations | `TWIN_ANALYZE` |
+| Sync, observations | `TWIN_OPERATOR` (+ loopback guard, still authoritative) |
+| `GET /actuator/health` | anonymous (status only) |
+| `GET /actuator/prometheus` | `TWIN_READ` |
+
+`TWIN_ADMIN` inherits the other three roles. Missing/invalid tokens get
+401, valid tokens without the role get 403. Configuration
+(`application.example.properties`, never committed with secrets):
+
+```properties
+systivex.security.jwt.enabled=true
+systivex.security.jwt.issuer-uri=${SYSTIVEX_ISSUER_URI:}
+systivex.security.jwt.jwk-set-uri=${SYSTIVEX_JWK_SET_URI:}
+systivex.security.jwt.accepted-audience=systivex
+systivex.security.jwt.role-claim=roles
+systivex.security.jwt.clock-skew-seconds=60
+systivex.security.jwt.allowed-roles=TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN
+```
+
+Set `$env:SYSTIVEX_ISSUER_URI="https://<trusted-issuer>"` before
+starting; without it the application fails fast instead of serving an
+unauthenticated API, and `enabled=false` is rejected. Tests use locally
+generated signing keys (`security/TestJwt.java`) — automated JWT
+coverage, not live identity-provider verification. The four
+target-service APIs are unchanged (open local-only endpoints).

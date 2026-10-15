@@ -147,6 +147,24 @@ consequential actions through explicit control-plane authorization.
   persisted, approved, or executed. No new dependencies. 17 new unit
   tests green (+ controller slice; HTTP integration suite added for
   Docker environments). See `DECISIONS.md` D27.
+- Phase 10 control-plane authentication & authorization (implemented
+  2026-10-15, live IdP verification pending — no trusted issuer
+  configured): OAuth2 resource-server JWT bearer authentication with
+  fail-closed `systivex.security.jwt.*` configuration (trusted issuer
+  mandatory, no security-off mode, audience/signature/expiry/`nbf`
+  always validated) and allowlist-only role mapping (`TWIN_READ`,
+  `TWIN_ANALYZE`, `TWIN_OPERATOR`, `TWIN_ADMIN`; admin inherits the
+  three lesser roles; malformed/unknown claims grant nothing).
+  Twin/impact/risk GETs need `TWIN_READ`, twin POSTs `TWIN_ADMIN`,
+  simulations/policy-evaluations `TWIN_ANALYZE`, sync/observations
+  `TWIN_OPERATOR` behind the still-authoritative loopback guards;
+  `/actuator/health` stays anonymous (status only),
+  `/actuator/prometheus` needs `TWIN_READ`, everything else denied.
+  401 on missing/invalid credentials, 403 on insufficient authority,
+  safe error bodies, no token logging. 31 new automated tests green
+  (test signing keys only — not live identity verification). No
+  approvals, execution, audit persistence, migrations, or
+  target-service auth added. See `DECISIONS.md` D28.
 
 **Not yet implemented** (planned architecture only):
 
@@ -178,8 +196,9 @@ Systivex/
 │       │   ├── SystivexApplication.java
 │       │   ├── twin/{model,repository,service,api}/
 │       │   ├── observation/           # Phase 4: read-only repo connector + POST /api/v1/twin/sync
-  │       │   ├── intelligence/          # Phase 5: impact BFS + GET /api/v1/twin/impact; Phase 7: risk + GET /api/v1/twin/risk; Phase 8: simulation + POST /api/v1/twin/simulations
-  │       │   ├── policy/                # Phase 9: advisory ALLOW/REVIEW/DENY + POST /api/v1/twin/policy-evaluations
+│       │   ├── intelligence/          # Phase 5: impact BFS + GET /api/v1/twin/impact; Phase 7: risk + GET /api/v1/twin/risk; Phase 8: simulation + POST /api/v1/twin/simulations
+│       │   ├── policy/                # Phase 9: advisory ALLOW/REVIEW/DENY + POST /api/v1/twin/policy-evaluations
+│       │   ├── security/              # Phase 10: JWT resource server, role policy, fail-closed config
 │       │   └── telemetry/             # Phase 6: pull-based runtime annotation + POST /api/v1/twin/observations
 │       ├── main/resources/application.properties          # LOCAL ONLY, git-ignored
 │       ├── main/resources/application.example.properties  # tracked safe template

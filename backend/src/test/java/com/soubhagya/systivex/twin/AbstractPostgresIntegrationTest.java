@@ -1,5 +1,8 @@
 package com.soubhagya.systivex.twin;
 
+import com.soubhagya.systivex.security.TestJwt;
+import com.soubhagya.systivex.security.TestJwtIntegrationConfig;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -10,6 +13,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * on machines where rapid container churn breaks port forwarding.
  * Nothing here touches the developer's local database.
  */
+@Import(TestJwtIntegrationConfig.class)
 public abstract class AbstractPostgresIntegrationTest {
 
     private static final PostgreSQLContainer POSTGRES =
@@ -24,5 +28,11 @@ public abstract class AbstractPostgresIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("systivex.security.jwt.issuer-uri", () -> TestJwt.ISSUER);
+        registry.add("systivex.security.jwt.accepted-audience", () -> TestJwt.AUDIENCE);
+        registry.add("systivex.security.jwt.role-claim", () -> "roles");
+        registry.add("systivex.security.jwt.clock-skew-seconds", () -> 60L);
+        registry.add("systivex.security.jwt.allowed-roles", () ->
+                "TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN");
     }
 }
