@@ -5,10 +5,46 @@ whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 8 — Deterministic change simulation (implemented 2026-10-15;
-automated unit tests green, Docker-gated integration suite added;
-live verification pending).** Phases 0–7 below
-are kept as history.
+**Phase 9 — Advisory policy evaluation (implemented 2026-10-15;
+automated unit tests green; integration tests require Docker; live
+verification pending).** Phases 0–8 below are kept as history.
+
+## What is complete (Phase 9, 2026-10-15 — implementation + automated unit tests complete)
+
+- [x] Advisory policy evaluation endpoint
+      (`POST /api/v1/twin/policy-evaluations`) in the new control-plane
+      `policy` package: accepts the exact Phase 8 proposal wire format,
+      re-runs the simulation server-side (caller-supplied risk/deltas
+      never trusted), and classifies the computed hypothetical result
+      with the immutable `policy-v1` ruleset — HIGH remaining or either
+      scope truncated → advisory DENY; increased/UNKNOWN/uncertain-stale
+      evidence → REVIEW; otherwise advisory ALLOW (never authorization).
+      Every fired rule reported sorted by code; DENY > REVIEW > ALLOW.
+      Bounded summary response with taxonomy version and explicit
+      non-authorization wording. No traversal/classification/validation
+      duplication; every new file under 400 lines.
+- [x] Read-only, non-persistent: one `@Transactional(readOnly=true)`
+      unit; no proposals, decisions, approvals, executions, or audit
+      records stored. No migration, no new dependencies, no configurable
+      policy surface, no approval workflow, no execution.
+- [x] Tests: 17 new unit tests, 0 failures (`PolicyEvaluatorTest` 13 —
+      every rule, precise increase definition, precedence, ordering,
+      determinism; `PolicyControllerTest` 4 — routing and 400/404/409
+      without a database). `PolicyApiTest` (12 HTTP/API integration
+      tests — decision matrix, stale/unknown evidence, determinism,
+      read-only proof, impact/risk/simulation stability) added for
+      Docker environments; not runnable here (no Docker daemon).
+      `backend/target-services/` and `observability/` untouched.
+- [ ] LIVE VERIFICATION (pending): policy evaluations against local
+      PostgreSQL 18 and live target services not observed in this phase
+      (no credential use, no service restarts, nothing claimed beyond
+      automated tests). Verdict: READY FOR REVIEW — implementation +
+      automated unit tests complete.
+- [ ] STILL DEFERRED: Tempo, twin trace/log presence signals, unified trace/log UI,
+      agents, approval workflow/execution/verification, Redis, brokers,
+      K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
+      broad authentication (Milestone 2C item 2 still open), column-level
+      lineage, READS inference, pagination beyond response limits.
 
 ## What is complete (Phase 8, 2026-10-15 — implementation + automated unit tests complete)
 
@@ -55,7 +91,7 @@ are kept as history.
       nothing claimed beyond automated tests). Verdict: READY FOR REVIEW —
       implementation + automated unit tests complete.
 - [ ] STILL DEFERRED: Tempo, twin trace/log presence signals, unified trace/log UI,
-      agents, policy/execution/verification, Redis, brokers,
+      agents, approval workflow/execution/verification, Redis, brokers,
       K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
       broad authentication (Milestone 2C item 2 still open), column-level
       lineage, READS inference, pagination beyond response limits.
@@ -764,7 +800,9 @@ These are **deferred by decision**, not missing by accident. Do not report them 
   (Loki log exploration is Phase 3B-2, above.)
 - Agent orchestration, tool mediation, evidence model. (Hypothetical
   change simulation is Phase 8, above — still read-only and advisory.)
-- Policy / approval / controlled-execution / verification logic.
+- Policy approval workflows, controlled execution, and verification
+  logic. (Advisory policy evaluation is Phase 9, above — still read-only,
+  non-persistent, and never authorization.)
 - Filtering, pagination (beyond impact-query `includeTypes`/caps), bulk import
   on the twin API. (Read-only impact traversal is Phase 5, above.)
 - Authentication/authorization on the API.

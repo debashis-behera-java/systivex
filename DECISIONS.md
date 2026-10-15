@@ -572,6 +572,50 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   for Docker environments). Live verification pending (see
   `PROJECT_STATUS.md`).
 
+## D27. Advisory policy evaluation over server-computed simulation — decided (2026-10-15)
+
+- **Decision:** The first `policy` module is a read-only deterministic
+  advisory evaluation (`POST /api/v1/twin/policy-evaluations`) over the
+  existing simulation pipeline. The request body is the exact Phase 8
+  proposal wire format (the shared `SimulationRequest` record — same
+  fields, same validation, no alternate names): caller-supplied risk or
+  delta content is never accepted. `PolicyService` re-runs the proposal
+  through `SimulationService` (identical 400/404/409 semantics, identical
+  roots/settings) and classifies the server-computed hypothetical result
+  with the pure, immutable `policy-v1` ruleset — no traversal,
+  classification, or validation duplication.
+- **Taxonomy `policy-v1` (documented in `PolicyTaxonomy`, fixed order,
+  every fired rule reported, final precedence `DENY > REVIEW >
+  ALLOW`):** `HIGH_RISK_REMAINS` (any HIGH in after-scope → advisory
+  DENY); `RESULT_TRUNCATED` (either scope truncated → advisory DENY,
+  fail-closed on partial evidence); `RISK_INCREASED` (newly impacted
+  risks appear, or a level moves upward with `LOW < MEDIUM < HIGH`
+  including any arrival at HIGH; UNKNOWN moves not reaching HIGH are
+  uncertainty, not increase → REVIEW); `UNKNOWN_RISK_PRESENT` (any
+  UNKNOWN in after-scope → REVIEW, missing evidence is not safety);
+  `EVIDENCE_UNCERTAIN` (any uncertain/stale after-scope evidence →
+  REVIEW). An ALLOW outcome is still advisory and never an authorization
+  grant; missing evidence, exceptions, invalid proposals, and incomplete
+  analysis never silently produce ALLOW. The taxonomy version travels in
+  the response.
+- **Response:** advisory `decision`, `policyVersion`, unmistakable
+  `ADVISORY POLICY EVALUATION — NOT AN AUTHORIZATION; NOT EXECUTED`
+  wording, sorted fired rules with stable codes, a bounded simulation
+  summary (graph counts, delta, limitations — not full scopes), and a
+  note stating nothing was authorized, approved, executed, or persisted.
+- **Rationale:** Risk says how the last observation reads and simulation
+  says what would change; policy answers whether the hypothetical
+  outcome is affirmable under explicit, reviewable rules — without
+  touching the twin and without granting anything. Recomputing
+  server-side closes the untrusted-evidence hole; immutable code rules
+  (no persistence, no config surface) keep the evaluated policy exactly
+  the shipped policy. Same trust posture as the intelligence endpoints
+  (read-only, local-only, no new auth); advisory and never authorization
+  (T4/T5), with T6 approval and T7 audit records still deferred.
+- **State:** Implemented and tested (pure rule-unit + controller slice
+  green without Docker; HTTP integration suite added for Docker
+  environments). Live verification pending (see `PROJECT_STATUS.md`).
+
 ## Supersession rule
 
 New decisions amend this file with date and rationale; they never silently edit

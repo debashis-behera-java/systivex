@@ -569,3 +569,51 @@ Notes and limits:
   EXECUTED` advisory mark every response. No migration, no writes, no
   new dependencies. Same trust level as the impact/risk endpoints; do
   not expose beyond the machine without auth.
+
+## 15. Advisory policy evaluation (Phase 9)
+
+Deterministic ALLOW/REVIEW/DENY over the server-computed hypothetical
+result (control plane running per §5, twin synced per §10 and observed
+per §12 — tests use Testcontainers instead). The request body is the
+exact Phase 8 proposal format; caller-supplied risk or deltas are never
+accepted:
+
+```powershell
+# Advisory decision for removing inventory_items from the gateway scope:
+$proposal = @{
+  from = @("target-service:gateway-service")
+  operations = @(
+    @{ type = "REMOVE_ENTITY"; entity = "target-table:inventory_db.inventory_items" }
+  )
+} | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/twin/policy-evaluations" -Method Post `
+  -ContentType "application/json" -Body $proposal |
+  Select-Object decision, policyVersion, @{ n = "rules"; e = { $_.rulesFired.code } }
+# -> decision REVIEW or DENY with stable rule codes on this graph
+#    (services without runtime read UNKNOWN); ALLOW only on a fresh,
+#    healthy, untruncated graph with no increases.
+```
+
+Notes and limits:
+
+- Same proposal validation as §14 (blank/oversized → 400, unknown →
+  404, conflicts → 409) before any evaluation; rejected proposals yield
+  no decision. The service re-runs the simulation server-side and
+  evaluates the computed after-scope risks, delta, and truncation flags
+  against the immutable `policy-v1` ruleset (see `PolicyTaxonomy`):
+  HIGH remaining or either scope truncated → advisory DENY; increased,
+  UNKNOWN, or uncertain/stale evidence → REVIEW; otherwise advisory
+  ALLOW. Every fired rule is reported, sorted by code; final precedence
+  is DENY > REVIEW > ALLOW.
+- The response carries a bounded simulation summary (graph counts,
+  delta, limitations — not full scopes), the taxonomy version, stable
+  reason codes, and explicit non-authorization wording (`ADVISORY POLICY
+  EVALUATION — NOT AN AUTHORIZATION; NOT EXECUTED`). ALLOW is still
+  advisory and never an authorization grant; no approval, execution, or
+  audit record is created.
+- One `@Transactional(readOnly=true)` unit: nothing is persisted — no
+  proposals, decisions, approvals, executions, or runtime metadata
+  (entity and relationship counts are identical before and after every
+  evaluation, asserted in tests). No migration, no writes, no new
+  dependencies, no configurable policy surface. Same trust level as the
+  intelligence endpoints; do not expose beyond the machine without auth.

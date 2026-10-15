@@ -232,7 +232,7 @@ business counters pulled from the loopback Actuator surface into a
 namespaced `runtime` metadata key (`telemetry` package,
 `POST /api/v1/twin/observations`; trace/log presence deliberately absent).
 No twin package beyond `twin` + `observation` + `intelligence` +
-`telemetry`, no simulation/risk/policy/execution yet.
+`telemetry` + `policy`, no approval workflow or execution yet.
 
 ## 6. Trust boundaries
 
@@ -352,6 +352,17 @@ Implemented:
   limitations, and `simulated: true` with the `SIMULATED — NOT EXECUTED`
   advisory (see `DECISIONS.md` D26). No traversal or classification
   duplication, no migration, no new dependencies, no writes of any kind.
+- Advisory policy evaluation (Phase 9): deterministic ALLOW/REVIEW/DENY
+  classification in the control plane (new `policy` package);
+  `POST /api/v1/twin/policy-evaluations` accepts the exact Phase 8
+  proposal wire format, re-runs the simulation server-side (never trusts
+  caller-supplied risk), and evaluates the computed hypothetical result
+  against the immutable `policy-v1` ruleset (HIGH/truncation → advisory
+  DENY; increase/unknown/uncertain → REVIEW; else advisory ALLOW, never
+  authorization). Bounded summary response with fired rules, stable
+  codes, and explicit non-authorization wording (see `DECISIONS.md`
+  D27). No persistence, no approval workflow, no execution, no new
+  dependencies, no writes of any kind.
 
 Why PostgreSQL + Flyway + a relational graph at this stage: the records the
 control plane will eventually authorize against (twin state, proposals,
@@ -362,11 +373,12 @@ consumer yet (see `DECISIONS.md` D10).
 
 Intentionally absent (not bugs — deferred by decision):
 
-- Twin trace/log presence signals, policy,
+- Twin trace/log presence signals, approval workflow, controlled
   execution, verification modules (the repository connector is Phase 4,
   above; read-only impact traversal is Phase 5, above; health/counter
   annotation is Phase 6, above; ordinal risk classification is Phase 7,
-  above; hypothetical change simulation is Phase 8, above).
+  above; hypothetical change simulation is Phase 8, above; advisory
+  policy evaluation is Phase 9, above).
 - Redis, Spring AI / Ollama, security, frontend.
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
   detection, any agent use of telemetry (later 3B slices and later).
@@ -375,7 +387,7 @@ Intentionally absent (not bugs — deferred by decision):
 - Target-service cross-database atomicity (rejected in D17; reconciliation is
   future work, not missing plumbing).
 
-Next architectural step (see `PROJECT_STATUS.md`): policy evaluation over
-the versioned risk taxonomy and simulation deltas — still without agents
-or execution, and never exposed beyond the local machine before the
-deferred authentication story lands.
+Next architectural step (see `PROJECT_STATUS.md`): approval workflow and
+controlled execution behind the policy gate — still without agents, and
+never exposed beyond the local machine before the deferred
+authentication story lands.

@@ -226,6 +226,22 @@ itself a place data can leak. The following holds for the current pipeline
   deltas are advisory reachability/risk differences, never authorization
   or fact about the live system (T4/T5); runtime metadata is reused
   unchanged and labelled as such, never simulated.
+- **Phase 9 advisory policy evaluation (2026-10-15): judgment, same
+  trust level as the intelligence endpoints.**
+  `POST /api/v1/twin/policy-evaluations` accepts the exact simulation
+  proposal format and re-runs the simulation server-side inside one
+  read-only transaction — caller-supplied risk or deltas are never
+  trusted as evidence (untrusted input cannot drive the outcome).
+  Decisions are advisory ALLOW/REVIEW/DENY from immutable code rules
+  (`policy-v1`, version pinned in-response); HIGH or truncated results
+  fail closed to advisory DENY, missing/stale evidence escalates to REVIEW at minimum and never reads as safe (T1/T3). The response states
+  unmistakably that nothing was authorized, approved, executed, or
+  persisted (T4/T5); no approval workflow, execution path, or audit
+  record is created, and none of the deferred T6/T7 machinery is
+  introduced. Error bodies reuse the existing handler (no secrets, no
+  stack traces — asserted in tests). Like the other intelligence
+  endpoints, local-development-only until the deferred auth story lands
+  (see §3: still open).
 
 ## 3. Out-of-scope today, in-scope for design
 
