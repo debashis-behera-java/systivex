@@ -4,6 +4,7 @@ import com.soubhagya.systivex.observation.OwnershipConflictException;
 import com.soubhagya.systivex.observation.SyncForbiddenException;
 import com.soubhagya.systivex.telemetry.ObservationForbiddenException;
 import com.soubhagya.systivex.twin.service.EntityNotFoundException;
+import com.soubhagya.systivex.intelligence.ProposalConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,6 +59,18 @@ public class RestExceptionHandler {
         return ErrorResponse.of(
                 HttpStatus.BAD_REQUEST.value(),
                 HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null);
+    }
+
+    @ExceptionHandler(ProposalConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleProposalConflict(
+            ProposalConflictException ex, HttpServletRequest request) {
+        return ErrorResponse.of(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
                 ex.getMessage(),
                 request.getRequestURI(),
                 null);

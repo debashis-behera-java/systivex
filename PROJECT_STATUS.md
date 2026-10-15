@@ -1,13 +1,64 @@
 # Systivex Project Status
 
-Last verified: **2026-10-14** (Asia/Kolkata). This document must be updated
+Last verified: **2026-10-15** (Asia/Kolkata). This document must be updated
 whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 7 — Deterministic change-risk assessment (implemented 2026-10-14;
-automated tests green, live verification pending).** Phases 0–6 below
+**Phase 8 — Deterministic change simulation (implemented 2026-10-15;
+automated unit tests green, Docker-gated integration suite added;
+live verification pending).** Phases 0–7 below
 are kept as history.
+
+## What is complete (Phase 8, 2026-10-15 — implementation + automated unit tests complete)
+
+- [x] Deterministic change simulation endpoint
+      (`POST /api/v1/twin/simulations`) in the control-plane
+      `intelligence` package: analysis roots plus a change proposal
+      (`REMOVE_ENTITY` with incident-edge cascade in the hypothetical
+      graph only, `ADD_RELATIONSHIP`, `REMOVE_RELATIONSHIP`), compared
+      as baseline versus hypothetical impact+risk over identical roots
+      and settings. Same `from` 1–10 / `maxDepth` 1–10 default 6 /
+      `includeTypes` validation as impact (400/404); fixed proposal
+      order — shape 400, resolution 404, conflicts 409 (root removal,
+      canonical duplicates/contradictions, existing/missing edges,
+      incident-to-removed). No traversal or classification duplication
+      (pure `SimulationProposalValidator` / `HypotheticalGraph` /
+      `SimulationDiff` + thin `SimulationService`); every new file under
+      400 lines.
+- [x] Response contract: `simulated: true` with the unmistakable
+      `SIMULATED — NOT EXECUTED` advisory, paired `before`/`after`
+      impact+risk scopes, deterministic `delta` (sorted added/removed
+      refs, risk membership and level changes, uncertainty counts,
+      truncation-changed flag), baseline/hypothetical `graph` summary,
+      and explicit `limitations` (advisory, runtime reuse, truncation
+      lines, uncertain-evidence lines, caps). Runtime telemetry reused
+      unchanged — no runtime behaviour simulated. One
+      `@Transactional(readOnly=true)` unit: no proposals, entities,
+      relationships, or runtime metadata persisted.
+- [x] Tests: 34 new unit tests, 0 failures (`SimulationProposalValidatorTest`
+      19 — complete validation matrix incl. phase order, alias-proof
+      duplicates, first-violation determinism; `HypotheticalGraphTest` 5 —
+      cascades, counts, baseline immutability, determinism;
+      `SimulationDiffTest` 6 — deltas, sorting, truncation matrix,
+      limitation lines; `SimulationControllerTest` 4 — routing and
+      400/404/409 mapping without a database). `SimulationApiTest` (19
+      HTTP/API integration tests — real 15/18 graph, cascades,
+      determinism, uncertainty, read-only proof, impact/risk stability)
+      added for Docker environments; not runnable here (no Docker
+      daemon). Focused unit run: 102 green, 0 failures (34 new + 68
+      pre-existing pure unit). `package -DskipTests` builds.
+      `backend/target-services/` and `observability/` untouched.
+- [ ] LIVE VERIFICATION (pending): control-plane boot + sync + observations +
+      simulation queries against local PostgreSQL 18 and live target services not
+      observed in this phase (no credential use, no service restarts,
+      nothing claimed beyond automated tests). Verdict: READY FOR REVIEW —
+      implementation + automated unit tests complete.
+- [ ] STILL DEFERRED: Tempo, twin trace/log presence signals, unified trace/log UI,
+      agents, policy/execution/verification, Redis, brokers,
+      K8s, vectors, MCP, frontend, Git remotes, watchers, schedulers,
+      broad authentication (Milestone 2C item 2 still open), column-level
+      lineage, READS inference, pagination beyond response limits.
 
 ## What is complete (Phase 7, 2026-10-14 — implementation + automated tests complete)
 
@@ -711,7 +762,8 @@ These are **deferred by decision**, not missing by accident. Do not report them 
 - Tempo trace exploration UI, unified trace/log UI, automated anomaly
   detection, any agent use of telemetry, observability-driven decisions.
   (Loki log exploration is Phase 3B-2, above.)
-- Agent orchestration, tool mediation, simulation, evidence model.
+- Agent orchestration, tool mediation, evidence model. (Hypothetical
+  change simulation is Phase 8, above — still read-only and advisory.)
 - Policy / approval / controlled-execution / verification logic.
 - Filtering, pagination (beyond impact-query `includeTypes`/caps), bulk import
   on the twin API. (Read-only impact traversal is Phase 5, above.)

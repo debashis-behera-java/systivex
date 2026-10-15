@@ -522,6 +522,56 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   14 HTTP/API integration tests against the real 15/18 graph). Live
   verification pending (see `PROJECT_STATUS.md`).
 
+## D26. Deterministic change simulation over a hypothetical graph — decided (2026-10-15)
+
+- **Decision:** The third `intelligence` module is a read-only
+  deterministic change simulation (`POST /api/v1/twin/simulations`):
+  the request carries analysis roots (`from` 1–10 UUID/external-ref,
+  `maxDepth` 1–10 default 6, `includeTypes` default
+  SERVICE/API/DATABASE/TABLE — validated with the exact impact-query
+  semantics via the shared `parseInputs`) plus a change proposal of
+  `REMOVE_ENTITY`, `ADD_RELATIONSHIP`, and `REMOVE_RELATIONSHIP`
+  operations. `REMOVE_ENTITY` deletes the entity and all incident
+  relationships in the hypothetical graph only. The service compares
+  baseline versus hypothetical impact and risk using identical roots and
+  settings, reusing the existing traversal (`analyzeResolved`) and risk
+  classification (`assessResolved`) — no algorithm duplication — and
+  returns deterministic deltas, explicit truncation/uncertainty
+  limitations, and `simulated: true` with the unmistakable
+  `SIMULATED — NOT EXECUTED` advisory. Nothing is persisted: no
+  proposals, entities, relationships, or runtime metadata are written
+  (one `@Transactional(readOnly=true)` unit).
+- **Validation order (fixed, first violation wins per phase):**
+  root/maxDepth/includeTypes (400/404, impact semantics) →
+  operation shape, 400 (`type`/`entity`/`source`/`target`/
+  `relationshipType` presence) → identifier resolution, 404 →
+  proposal conflicts, 409, in listed order: removing an analysis root;
+  duplicate exact operations (canonical UUID comparison, so UUID and
+  external-reference spellings of the same endpoint collide);
+  contradictory add-plus-remove of one edge; adding an existing edge or
+  removing a non-existent one; any relationship operation incident to an
+  entity removed by the same proposal. Unknown operation types fail 400
+  at JSON binding through the existing handler.
+- **Structure:** pure units (`SimulationProposalValidator`,
+  `HypotheticalGraph`, `SimulationDiff` — no repository, no Spring,
+  unit-tested without a database) orchestrated by a thin
+  `SimulationService`; every new file stays under 400 lines. Runtime
+  telemetry is reused unchanged and labelled as such — no runtime
+  behaviour is simulated.
+- **Rationale:** Impact says what is reachable and risk says how the last
+  observation reads; simulation answers the next question — what would
+  reachability and risk look like if a proposed change were applied —
+  without touching the twin. Canonical (UUID-level) comparison closes
+  the alias hole where the same endpoint spelled two ways would slip
+  past duplicate/contradiction checks. The fixed validation order keeps
+  400/404/409 semantics reviewable and testable. Same trust posture as
+  the impact/risk GETs (read-only, local-only, no new auth); the result
+  is advisory and never authorization (T4/T5).
+- **State:** Implemented and tested (34 pure unit tests + controller
+  slice tests green without Docker; full HTTP integration suite added
+  for Docker environments). Live verification pending (see
+  `PROJECT_STATUS.md`).
+
 ## Supersession rule
 
 New decisions amend this file with date and rationale; they never silently edit

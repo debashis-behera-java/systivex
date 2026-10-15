@@ -205,6 +205,27 @@ itself a place data can leak. The following holds for the current pipeline
   response so future policy work can pin exactly what it consumed. Like
   the impact endpoint, local-development-only until the deferred auth
   story lands (see §3: still open).
+- **Phase 8 change simulation (2026-10-15): hypothetical, same trust
+  level as the impact/risk endpoints.** `POST /api/v1/twin/simulations`
+  looks like a write but performs none: the proposal is validated and
+  applied to in-memory working copies inside one read-only transaction
+  (counts unchanged after simulations, asserted in tests), and every
+  response carries `simulated: true` plus the unmistakable
+  `SIMULATED — NOT EXECUTED` advisory so a hypothetical result can
+  never be mistaken for executed or persisted state (T1/T3). Input is
+  validated in a fixed order before any graph work — impact conventions
+  for roots/depth/types, then operation shape (400), identifier
+  resolution (404), then proposal conflicts (409: root removal,
+  canonical duplicates/contradictions, existing/missing edges,
+  incident-to-removed) per T2; error bodies reuse the existing handler
+  (no secrets, no stack traces — asserted in tests). Canonical
+  UUID-level comparison closes the alias hole (same endpoint spelled as
+  UUID vs external reference). No authentication infrastructure is
+  introduced: like the impact/risk endpoints, local-development-only
+  until the deferred auth story lands (see §3: still open). Simulation
+  deltas are advisory reachability/risk differences, never authorization
+  or fact about the live system (T4/T5); runtime metadata is reused
+  unchanged and labelled as such, never simulated.
 
 ## 3. Out-of-scope today, in-scope for design
 

@@ -123,14 +123,27 @@ consequential actions through explicit control-plane authorization.
   freshness; sorted reasons with `uncertain`/`stale` flags; read-only,
   advisory, never authorization). No traversal duplication, no migration,
   no new dependencies. 36 new tests green. See `DECISIONS.md` D25.
+- Phase 8 change simulation (implemented 2026-10-15, live verification
+  pending): hypothetical before/after comparison in
+  `backend/.../intelligence/` via `POST /api/v1/twin/simulations` —
+  validated change proposals (`REMOVE_ENTITY` with incident-edge cascade,
+  `ADD_RELATIONSHIP`, `REMOVE_RELATIONSHIP`; fixed 400/404/409 order)
+  replayed through the Phase 5 traversal and Phase 7 classification over
+  identical roots and settings, returning deterministic deltas, explicit
+  truncation/uncertainty limitations, and `simulated: true` with the
+  `SIMULATED — NOT EXECUTED` advisory. Nothing is persisted or executed.
+  No algorithm duplication, no migration, no new dependencies. 34 new
+  unit tests green (+ controller slice; HTTP integration suite added for
+  Docker environments). See `DECISIONS.md` D26.
 
 **Not yet implemented** (planned architecture only):
 
 - Twin trace/log presence signals (health/counter annotation is Phase 6),
   Git integration
 - Agent orchestration, tooling, evidence model
-- Policy / risk / approval engine and controlled execution, simulation
-  (beyond read-only impact paths), verification
+- Policy / risk / approval engine and controlled execution
+  (impact paths are Phase 5, risk classification Phase 7, hypothetical
+  simulation Phase 8 — all read-only and advisory), verification
 - Cross-database checkout atomicity/reconciliation, cache (Redis), Spring AI / Ollama, frontend
 - Trace exploration UI (Tempo), unified trace/log UI, anomaly detection,
   any agent or automated use of telemetry (Loki log exploration is done;
@@ -152,7 +165,7 @@ Systivex/
 │       │   ├── SystivexApplication.java
 │       │   ├── twin/{model,repository,service,api}/
 │       │   ├── observation/           # Phase 4: read-only repo connector + POST /api/v1/twin/sync
-│       │   ├── intelligence/          # Phase 5: impact BFS + GET /api/v1/twin/impact; Phase 7: risk + GET /api/v1/twin/risk
+  │       │   ├── intelligence/          # Phase 5: impact BFS + GET /api/v1/twin/impact; Phase 7: risk + GET /api/v1/twin/risk; Phase 8: simulation + POST /api/v1/twin/simulations
 │       │   └── telemetry/             # Phase 6: pull-based runtime annotation + POST /api/v1/twin/observations
 │       ├── main/resources/application.properties          # LOCAL ONLY, git-ignored
 │       ├── main/resources/application.example.properties  # tracked safe template

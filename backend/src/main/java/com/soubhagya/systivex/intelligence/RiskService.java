@@ -2,6 +2,7 @@ package com.soubhagya.systivex.intelligence;
 
 import com.soubhagya.systivex.twin.model.SystemEntity;
 import com.soubhagya.systivex.twin.model.SystemEntityType;
+import com.soubhagya.systivex.twin.model.SystemRelationship;
 import com.soubhagya.systivex.twin.repository.SystemEntityRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -57,9 +59,30 @@ public class RiskService {
     public RiskResponse assess(
             List<String> rawFrom, Integer rawMaxDepth, List<String> rawIncludeTypes) {
         ImpactResponse impact = impactService.analyze(rawFrom, rawMaxDepth, rawIncludeTypes);
+        return classify(impact, entities.findAll());
+    }
+
+    /**
+     * Reuse the traversal for a caller-supplied (baseline or hypothetical)
+     * graph snapshot. Package-private so simulation reuses classification
+     * without duplicating it.
+     */
+    RiskResponse assessResolved(
+            List<SystemEntity> starts,
+            int maxDepth,
+            Set<SystemEntityType> includeTypes,
+            List<SystemEntity> allEntities,
+            List<SystemRelationship> allRelationships) {
+        ImpactResponse impact =
+                impactService.analyzeResolved(
+                        starts, maxDepth, includeTypes, allEntities, allRelationships);
+        return classify(impact, allEntities);
+    }
+
+    private RiskResponse classify(ImpactResponse impact, List<SystemEntity> allEntities) {
         Instant now = Instant.now();
         Map<UUID, SystemEntity> index = new HashMap<>();
-        for (SystemEntity entity : entities.findAll()) {
+        for (SystemEntity entity : allEntities) {
             index.put(entity.getId(), entity);
         }
         Map<UUID, Integer> pathCounts = new HashMap<>();

@@ -97,6 +97,26 @@ public class ImpactAnalysisService {
     @Transactional(readOnly = true)
     public ImpactResponse analyze(
             List<String> rawFrom, Integer rawMaxDepth, List<String> rawIncludeTypes) {
+        ParsedInputs inputs = parseInputs(rawFrom, rawMaxDepth, rawIncludeTypes);
+        List<SystemEntity> allEntities = entities.findAll();
+        List<SystemRelationship> allRelationships = relationships.findAll();
+        return analyzeResolved(
+                inputs.starts(), inputs.maxDepth(), inputs.includeTypes(),
+                allEntities, allRelationships);
+    }
+
+    /** Validated, resolved, and sorted query inputs shared by analyze and simulation. */
+    record ParsedInputs(
+            List<SystemEntity> starts, int maxDepth, Set<SystemEntityType> includeTypes) {}
+
+    /**
+     * Validates raw query input with impact-query semantics (blank/oversized
+     * input fails 400, unknown identifiers 404) and returns resolved inputs.
+     * Package-private so simulation validates identically without duplicating
+     * the semantics.
+     */
+    ParsedInputs parseInputs(
+            List<String> rawFrom, Integer rawMaxDepth, List<String> rawIncludeTypes) {
         if (rawFrom == null || rawFrom.isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one starting entity is required (query parameter 'from')");
@@ -131,8 +151,21 @@ public class ImpactAnalysisService {
                                 Comparator.nullsLast(String::compareTo))
                         .thenComparing(e -> e.getId().toString()));
 
-        List<SystemEntity> allEntities = entities.findAll();
-        List<SystemRelationship> allRelationships = relationships.findAll();
+        return new ParsedInputs(starts, maxDepth, includeTypes);
+    }
+
+    /**
+     * Runs the deterministic BFS core over caller-supplied entity and edge
+     * collections (baseline snapshot or hypothetical simulation working
+     * sets). Package-private so simulation reuses the traversal without
+     * duplicating it; callers must have validated and resolved inputs first.
+     */
+    ImpactResponse analyzeResolved(
+            List<SystemEntity> starts,
+            int maxDepth,
+            Set<SystemEntityType> includeTypes,
+            List<SystemEntity> allEntities,
+            List<SystemRelationship> allRelationships) {
         return analyzeGraph(
                 starts,
                 allEntities,
@@ -141,6 +174,15 @@ public class ImpactAnalysisService {
                 includeTypes,
                 new ImpactResponse.Limits(
                         MAX_STARTS, MAX_DEPTH_ALLOWED, MAX_NODES, MAX_PATHS));
+    }
+
+    /**
+     * Resolves one UUID-or-external-reference identifier with the exact
+     * semantics of the impact query (404 on unknown). Package-private so
+     * simulation resolves proposal references identically.
+     */
+    SystemEntity resolveEntity(String raw) {
+        return resolve(raw);
     }
 
     private SystemEntity resolve(String raw) {

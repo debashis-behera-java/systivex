@@ -516,3 +516,56 @@ Notes and limits:
   Advisory only: potentially affected is not confirmed breakage, and the
   result never authorizes an action. Read-only GET at the same trust level
   as the impact endpoint; do not expose beyond the machine without auth.
+
+## 14. Change simulation (Phase 8)
+
+Hypothetical before/after comparison over the persisted twin graph plus
+runtime metadata (control plane running per §5, twin synced per §10 and
+observed per §12 — tests use Testcontainers instead):
+
+```powershell
+# What would change if inventory_items and its edges were gone?
+$proposal = @{
+  from = @("target-service:gateway-service")
+  operations = @(
+    @{ type = "REMOVE_ENTITY"; entity = "target-table:inventory_db.inventory_items" }
+  )
+} | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/twin/simulations" -Method Post `
+  -ContentType "application/json" -Body $proposal |
+  Select-Object simulated, advisory,
+    @{ n = "removed"; e = { $_.delta.impactedRemoved } },
+    @{ n = "graph"; e = { $_.graph } }
+# -> simulated True, advisory "SIMULATED — NOT EXECUTED",
+#    removed lists inventory_items, graph shows one fewer entity and the
+#    cascaded edges gone from the hypothetical counts.
+```
+
+Notes and limits:
+
+- Same `from` (1–10 UUID/external-ref), `maxDepth` (1–10, default 6),
+  and `includeTypes` conventions as §11, validated identically
+  (blank/oversized → 400, unknown → 404). Operations are limited to
+  `REMOVE_ENTITY` (entity plus all incident relationships disappear from
+  the hypothetical graph only), `ADD_RELATIONSHIP`, and
+  `REMOVE_RELATIONSHIP`. Fixed validation order: shape → 400,
+  resolution → 404, proposal conflicts → 409 (analysis-root removal,
+  duplicate/contradictory operations compared canonically so UUID and
+  external-reference spellings collide, adding an existing edge,
+  removing a missing edge, edges incident to a removed entity).
+- Both scopes reuse the Phase 5 traversal and the Phase 7
+  classification over identical roots and settings — no duplicated
+  algorithms. The response pairs `before`/`after` impact+risk scopes
+  with a deterministic `delta` (sorted added/removed refs, risk
+  membership and level changes, uncertainty counts, truncation-changed
+  flag), a baseline/hypothetical `graph` summary, and explicit
+  `limitations` (truncation lines, uncertain-evidence lines, runtime
+  reuse, caps). Runtime telemetry is reused unchanged; no runtime
+  behaviour is simulated.
+- One `@Transactional(readOnly=true)` unit: nothing is persisted — no
+  proposals, entities, relationships, or runtime metadata (entity and
+  relationship counts are identical before and after every simulation,
+  asserted in tests). `simulated: true` and the `SIMULATED — NOT
+  EXECUTED` advisory mark every response. No migration, no writes, no
+  new dependencies. Same trust level as the impact/risk endpoints; do
+  not expose beyond the machine without auth.

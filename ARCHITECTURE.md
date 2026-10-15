@@ -340,6 +340,18 @@ Implemented:
   health, cumulative failures, 30-minute freshness; sorted reasons,
   uncertainty flags; see `DECISIONS.md` D25). No traversal duplication, no
   migration, no new dependencies, no writes.
+- Change simulation (Phase 8): read-only before/after comparison in the
+  control plane (`intelligence` package);
+  `POST /api/v1/twin/simulations` validates a change proposal
+  (`REMOVE_ENTITY` with incident-edge cascade, `ADD_RELATIONSHIP`,
+  `REMOVE_RELATIONSHIP`; fixed 400/404/409 order, canonical duplicate
+  detection) and replays the Phase 5 traversal plus the Phase 7
+  classification over identical roots and settings on the baseline and
+  on an in-memory hypothetical graph. Returns deterministic deltas,
+  baseline/hypothetical counts, explicit truncation/uncertainty
+  limitations, and `simulated: true` with the `SIMULATED — NOT EXECUTED`
+  advisory (see `DECISIONS.md` D26). No traversal or classification
+  duplication, no migration, no new dependencies, no writes of any kind.
 
 Why PostgreSQL + Flyway + a relational graph at this stage: the records the
 control plane will eventually authorize against (twin state, proposals,
@@ -350,11 +362,11 @@ consumer yet (see `DECISIONS.md` D10).
 
 Intentionally absent (not bugs — deferred by decision):
 
-- Twin trace/log presence signals, simulation, policy,
+- Twin trace/log presence signals, policy,
   execution, verification modules (the repository connector is Phase 4,
   above; read-only impact traversal is Phase 5, above; health/counter
   annotation is Phase 6, above; ordinal risk classification is Phase 7,
-  above).
+  above; hypothetical change simulation is Phase 8, above).
 - Redis, Spring AI / Ollama, security, frontend.
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
   detection, any agent use of telemetry (later 3B slices and later).
@@ -364,6 +376,6 @@ Intentionally absent (not bugs — deferred by decision):
   future work, not missing plumbing).
 
 Next architectural step (see `PROJECT_STATUS.md`): policy evaluation over
-the versioned risk taxonomy — still without agents or execution, and never
-exposed beyond the local machine before the deferred authentication story
-lands.
+the versioned risk taxonomy and simulation deltas — still without agents
+or execution, and never exposed beyond the local machine before the
+deferred authentication story lands.
