@@ -276,10 +276,15 @@ itself a place data can leak. The following holds for the current pipeline
   service's database credential remains a separate local secret;
   compromising one application user yields that service's database only.
 - Twin-connector authentication and data-integrity guarantees.
-- Approval UX and delegation model; risk-classification taxonomy.
+- Approval UX and delegation model (governance design agreed in
+  `DECISIONS.md` D29 — distinct `TWIN_APPROVER`, hard separation of
+  duties, DENY-never-approvable; implementation pending, none of it may
+  be claimed as built); risk-classification taxonomy.
 - Execution sandboxing, blast-radius limits, rollback/verification loops.
-- Persistence hardening and audit-log immutability (tables exist now;
-  hardening still to come).
+- Persistence hardening and audit-log immutability (twin tables exist
+  now; the audit chain is designed in `DECISIONS.md` D29 as
+  tamper-evident — hash-chained with a verify endpoint — explicitly not
+  tamper-proof against a database superuser; implementation pending).
 
 Each must reference the principle(s) above when introduced; any exception
 requires a dated entry in `DECISIONS.md`.

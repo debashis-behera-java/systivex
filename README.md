@@ -174,7 +174,8 @@ consequential actions through explicit control-plane authorization.
 - Approval workflows and controlled execution
   (impact paths are Phase 5, risk classification Phase 7, hypothetical
   simulation Phase 8, advisory policy evaluation Phase 9 — all
-  read-only and advisory), verification
+  read-only and advisory; governed proposals + audit designed in
+  `DECISIONS.md` D29, not yet implemented), verification
 - Cross-database checkout atomicity/reconciliation, cache (Redis), Spring AI / Ollama, frontend
 - Trace exploration UI (Tempo), unified trace/log UI, anomaly detection,
   any agent or automated use of telemetry (Loki log exploration is done;

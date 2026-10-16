@@ -48,8 +48,16 @@ public class PolicyService {
      */
     @Transactional(readOnly = true)
     public PolicyEvaluationResponse evaluate(SimulationRequest request) {
-        SimulationResponse simulation = simulationService.simulate(request);
+        return evaluateResolved(simulationService.simulate(request));
+    }
 
+    /**
+     * Classifies an already-computed simulation against the immutable
+     * {@code policy-v1} ruleset. Public so governed assessment evaluates
+     * the simulation it captured over its own snapshot.
+     */
+    @Transactional(readOnly = true)
+    public PolicyEvaluationResponse evaluateResolved(SimulationResponse simulation) {
         PolicyEvaluator.Evaluation evaluation =
                 PolicyEvaluator.evaluate(
                         simulation.after().risk().risks(),

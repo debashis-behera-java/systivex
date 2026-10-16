@@ -9,6 +9,208 @@ whenever the implemented state changes. Planned items are not claimed as done.
 2026-10-15; automated tests green; live IdP verification pending — no
 trusted issuer configured).** Phases 0–9 below are kept as history.
 
+## Next phase (designed, not implemented)
+
+**Phase 11 — Governed change proposals and tamper-evident audit
+(design agreed 2026-10-15 in `DECISIONS.md` D29; no code, migration,
+or endpoint built).** Eight governance decisions recorded
+(distinct `TWIN_APPROVER` without admin inheritance, DENY never
+approvable, stale-assessment rejection, 7-day/30-day lazy TTL,
+mandatory reasons, `TWIN_READ` audit visibility with no deletion or
+repair, `(issuer, subject)` separation of duties, fully transactional
+state changes with no execution). Revision model (immutable revision
+rows, JPA version kept concurrency-only) and snapshot-consistency
+strategy (content-hash fingerprint excluding runtime evidence, separate
+risk-freshness recheck) resolved in D29. Implementation pending — none
+of it may be claimed as done until its slices land with green tests.
+
+## Phase 11 S1 — Governance persistence foundation (implemented
+2026-10-15; migration + persistence tests green)
+
+- [x] Flyway `V2__proposal_governance.sql`: `proposal_revision`
+  (`proposal_key` + 1-based `revision_number` unique, CHECK-constrained
+  lifecycle states, title ≤256 / description ≤4000, canonical
+  operations JSONB + hash, optional assessment JSONB + hash, policy /
+  risk / fingerprint / snapshot evidence, proposer and approver
+  issuer+subject, reason ≤1024, expiry/creation/update timestamps,
+  separate `jpa_version` concurrency column), `audit_event` (unique
+  `seq` allocated later under the head-row lock — no database sequence,
+  action/outcome CHECKs, FK to the exact revision), and
+  `audit_chain_head` (singleton row, genesis `last_seq = 0` /
+  `last_hash = 'GENESIS'`). Twin tables untouched; VARCHAR (no PG
+  enums) per V1 conventions.
+- [x] Persistence only (`proposal/model` + `proposal/repository`):
+  `ProposalRevision`, `AuditEvent`, `AuditChainHead` entities and
+  repositories (revision history in order, sequence-order reads,
+  pessimistic-lock head finder). No lifecycle services, no audit
+  append/verification logic, no controllers, no audit writes anywhere.
+- [x] Tests: 15 green (`GovernanceMigrationTest` 3 — isolated V1→V2
+  upgrade with twin data intact, governance constraints present,
+  genesis head row exactly once; `ProposalPersistenceTest` 9 — JSONB
+  round-trip, `@Version` independent of revision number, ordering,
+  duplicate/check/FK rejections, head lock-load; `FlywayMigrationTest`
+  updated to V1+V2 history). Every code file under 400 lines; no new
+  dependencies.
+- [ ] Still pending: lifecycle services, audit append/verify, proposal
+  and approval APIs, `TWIN_APPROVER` role wiring, expiry handling —
+  later slices. None of these exist yet and none are claimed.
+
+## Phase 11 S2 — Tamper-evident audit chain (implemented 2026-10-15;
+audit service + verify endpoint tests green)
+
+- [x] Transactional `AuditService.append` (`proposal/service`): locks
+  the singleton head row (`SELECT … FOR UPDATE`), allocates
+  `last_seq + 1` (no database sequence, so rollbacks leave no gaps),
+  hashes canonical fields with `prev_hash` set to the head hash, inserts
+  the event and advances the head in one transaction — any failure rolls
+  back both. Rejects null/blank/overlong inputs (400) and unknown
+  revisions (404); DB CHECKs and the revision FK hold as backstops.
+- [x] Hash format `audit-event-v1`: SHA-256 (JDK only) over the UTF-8
+  bytes of one fixed-order JSON array — format tag, seq, ISO-8601
+  timestamp (truncated to millis so the hashed value round-trips
+  through TIMESTAMPTZ exactly), actor issuer/subject, action, outcome,
+  proposal key/revision, operations/assessment hashes, reason,
+  correlation ID, previous hash; nulls as JSON null, `event_hash`
+  itself excluded. Appender and verifier share the single `AuditHash`
+  implementation; genesis `prev_hash` is the V2 `GENESIS` marker.
+- [x] Read-only `AuditService.verify` returning bounded `OK`/`BROKEN`
+  results (event count, head seq, first broken seq, one triage reason —
+  no secrets): empty chain OK only at genesis; contiguity 1..N;
+  prev-link, recomputed-hash, and head-match checks; never repairs.
+  `GET /api/v1/twin/audit/verify` requires `TWIN_READ` (stateless JWT
+  unchanged, default-deny intact); no HTTP append endpoint exists, and
+  POSTs to audit paths stay 403.
+- [x] Tests: 17 green (`AuditChainTest` 12 — genesis, single/multiple
+  appends, all tamper classes, gap/reorder detection, injected-failure
+  rollback of both rows, 8-thread contiguous sequences, invalid inputs;
+  `AuditVerifyApiTest` 5 — `TWIN_READ` 200 `OK`, anonymous 401,
+  insufficient roles 403, tampered chain surfaces as HTTP 200 `BROKEN`,
+  no arbitrary-append endpoint). Fixtures reference real revisions for
+  the FK; tables cleaned before/after each test. Every code file under
+  400 lines; no new dependencies.
+- [ ] Still pending: proposal lifecycle services and mutation APIs,
+  `TWIN_APPROVER` role wiring, expiry handling — later slices. The
+  chain is tamper-evident, not externally anchored; database-superuser
+  rewriting is detected, not prevented.
+
+## Phase 11 S3 — Proposal drafts, withdrawal & read APIs (implemented
+2026-10-15; proposal API tests green)
+
+- [x] `ProposalService` + `ProposalController` (`proposal/service`,
+  `proposal/api`): `POST /api/v1/twin/proposals` (`TWIN_ANALYZE`)
+  resolves identifiers with impact-query semantics, validates through
+  `SimulationProposalValidator` (empty analysis roots), stores the
+  resolved canonical operations plus SHA-256 hash as revision 1
+  `DRAFT` with proposer identity taken from the JWT (never the body),
+  and appends the `CREATED` audit event in the same transaction —
+  201 with `Location`, assessment fields null (S4 input is exactly the
+  stored canonical operations; no caller assessment exists to trust).
+  `POST /proposals/{key}/withdraw` allows proposer-or-`TWIN_ADMIN`
+  `DRAFT → WITHDRAWN` only (SoD pair comparison, 403 otherwise,
+  409 on terminal/repeat via conflict or optimistic-lock mapping);
+  reads (`GET /proposals` capped paging, latest, history, single
+  revision, per-proposal audit) require `TWIN_READ` and return DTOs
+  with no JPA version, secrets, or claims. No approve/reject/expiry/
+  execution capability exists (assess/submit/amend landed in S4
+  below).
+- [x] Tests: 14 green (`ProposalApiTest` 7 — canonical resolution
+  and JWT identity, hash determinism, 400/404/409 validation, role
+  matrix, authorized/ordered/bounded reads, 404s, read matrix;
+  `ProposalWithdrawApiTest` 6 — proposer success with exactly one new
+  event, stranger 403, admin success without impersonation, repeat
+  409, concurrent withdrawals yielding one winner, no approval
+  endpoint; `ProposalCreationRollbackTest` 1 — failing audit append
+  rolls back the draft, zero rows left). Fixtures namespaced and
+  removed; no exact-timestamp assertions. Every code file under 400
+  lines; no new dependencies.
+- [ ] Still pending: approval/rejection with `TWIN_APPROVER` (S5),
+  expiry handling (S6). None of these exist yet and none are claimed.
+
+## Phase 11 S4 — Assessment, submission & amendments (implemented
+2026-10-16; code + Testcontainers/API tests written; automated
+verification partial — see limits below)
+
+- [x] `POST /api/v1/twin/proposals/{key}/assess` (`TWIN_ANALYZE`):
+  current revision must be `DRAFT` (409 otherwise); persisted
+  canonical operations re-validated server-side
+  (`SimulationProposalValidator` over a snapshot resolver — caller
+  supplies no assessment/risk/policy/delta to trust). Twin
+  entity/edge lists loaded once inside a `REPEATABLE_READ`
+  transaction; validation, `simulateResolved`, `evaluateResolved`,
+  and `TwinFingerprint` all run over those exact in-memory lists —
+  `ImpactAnalysisService.parseSnapshotInputs` resolves analysis
+  roots against the snapshot (no repository reload), so simulation,
+  impact, risk, policy, and fingerprint describe one captured state.
+  Stores the bounded assessment document (settings, simulation graph
+  + delta + limitations, policy decision/version/rules, risk
+  taxonomy/snapshot-time/levels/uncertain/stale lists) plus
+  `assessment_hash` (SHA-256), `twin_fingerprint`, `policy_version`,
+  `risk_taxonomy`, `snapshot_observed_at`, 7-day `expires_at`;
+  retains `operations_hash`. `DRAFT → ASSESSED` plus the `ASSESSED`
+  audit event commit in one transaction; any computation, validation,
+  or audit failure persists nothing (status stays `DRAFT`).
+  Fingerprint is content-derived (sorted entity
+  id/type/name/refs/environment + structural metadata minus the
+  `runtime` subtree, sorted relationship keys; `updated_at` never
+  hashed), so routine telemetry refreshes preserve it while
+  structural changes alter it; risk freshness stays separate in the
+  assessment evidence.
+- [x] `POST /api/v1/twin/proposals/{key}/submit` (`TWIN_ANALYZE`):
+  only `ASSESSED → AWAITING_APPROVAL` (409 on any other status).
+  `SubmitRequest{revisionNumber, operationsHash, assessmentHash}`
+  binds the call to the exact stored assessment — no JPA version
+  exposed; null hashes are 409 mismatches, never 500s. Verifies
+  business revision, recomputed operations hash, recomputed
+  assessment hash, complete evidence
+  (fingerprint/policy/snapshot), and unexpired TTL before
+  transitioning; `SUBMITTED` audit event in the same transaction
+  (409 on revision/hash mismatch, incomplete evidence, or expiry).
+  No client-supplied risk/policy/fingerprint/assessment overwrite.
+- [x] `PATCH /api/v1/twin/proposals/{key}` (`TWIN_ANALYZE`,
+  proposer-or-`TWIN_ADMIN`, 403 otherwise): eligible non-terminal
+  revisions only (`DRAFT`/`ASSESSED`/`AWAITING_APPROVAL`; terminal
+  `APPROVED`/`REJECTED`/`WITHDRAWN`/`EXPIRED`/`SUPERSEDED` → 409).
+  Re-validates and re-canonicalizes the amended operations
+  server-side with a fresh operations hash; atomically marks the
+  prior revision `SUPERSEDED`, inserts revision N+1 as `DRAFT` with
+  no inherited assessment/approval/decision, and appends
+  `SUPERSEDED` + `CREATED` audit events in one transaction. Prior
+  rows, assessments, and audit references preserved. Optimistic
+  locking (`@Version`) plus the `(proposal_key, revision_number)`
+  unique constraint serialize concurrent amendments (loser gets
+  409; no duplicate numbers, no double-latest). No approval,
+  rejection, execution, scheduler, side effect, or new dependency.
+- [x] Tests written (PostgreSQL/Testcontainers + API, deterministic
+  fixtures): `ProposalAssessApiTest` 8 — server-side evidence,
+  fingerprint determinism, runtime-only refresh invariance,
+  structural-change sensitivity, invalid/conflicting operations
+  leaving `DRAFT`, role matrix + repeat-assess 409;
+  `ProposalSubmitAmendApiTest` 8 — exact-assessment submit, stale
+  revision/hash/status/expiry 409s, amendment forking with history
+  preservation, terminal/stranger 403/404/409s, concurrent submits
+  → one winner, concurrent amends → single rev 2, concurrent
+  submit-vs-amend → no contradictory state, endpoint role matrix;
+  `ProposalMutationRollbackTest` 3 — injected audit failure rolls
+  back assess (stays `DRAFT`, zero events), submit (stays
+  `ASSESSED`), and amend (single `DRAFT` row). Every S4 code/test
+  file under 400 lines; no new dependencies; `TWIN_APPROVER` not
+  added.
+- [ ] AUTOMATED VERIFICATION LIMITS (2026-10-16): the three S4
+  suites above were not executed green in this session — the
+  Docker daemon is down (`docker ps` cannot reach
+  `dockerDesktopLinuxEngine`), so Testcontainers cannot start
+  PostgreSQL (`Could not find a valid Docker environment`) and all
+  19 S4 integration tests error at container startup. Verified
+  instead: `test-compile` clean; 143 Docker-free unit tests green
+  (intelligence/policy/traversal/controller/security/parser
+  suites incl. the exact simulation/impact/risk/policy algorithms
+  assessment reuses); `package -DskipTests` builds;
+  `git diff --check` clean. Full `./mvnw clean test` was not
+  green in this environment (blocked on Docker, not on code) and
+  is not claimed. Live verification not performed.
+- [ ] Still pending: approval/rejection with `TWIN_APPROVER` (S5),
+  expiry handling (S6). None of these exist yet and none are claimed.
+
 ## What is complete (Phase 10, 2026-10-15 — implementation + automated tests complete)
 
 - [x] OAuth2 resource-server JWT authentication on the control plane (no

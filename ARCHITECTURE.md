@@ -65,7 +65,12 @@ packages exist for them by decision:
   exists since Phase 5**: `GET /api/v1/twin/impact`; **ordinal risk
   classification exists since Phase 7**: `GET /api/v1/twin/risk` over impact
   paths plus runtime metadata; simulation still planned)
-- `policy` — policy evaluation and approval workflow (planned)
+- `policy` — policy evaluation and approval workflow (**advisory evaluation
+  exists since Phase 9**; governed proposals + audit designed in Phase 11,
+  see `DECISIONS.md` D29 — not yet implemented)
+- `proposal` — governed change proposals and tamper-evident audit
+  (designed, not yet created — no placeholder package exists for it by
+  decision; see `DECISIONS.md` D29)
 - `execution` — controlled, auditable action dispatch (planned)
 - `verification` — post-change checks against twin + runtime (planned)
 - `observation` — code/arch/runtime ingest (**repository connector exists

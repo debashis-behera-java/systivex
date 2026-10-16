@@ -130,6 +130,14 @@ public class SecurityConfig {
                                         .requestMatchers(HttpMethod.POST, "/api/v1/twin/relationships").hasRole("TWIN_ADMIN")
                                         .requestMatchers(HttpMethod.POST, "/api/v1/twin/simulations",
                                                 "/api/v1/twin/policy-evaluations").hasRole("TWIN_ANALYZE")
+                                        .requestMatchers(HttpMethod.GET, "/api/v1/twin/audit/verify").hasRole("TWIN_READ")
+                                        .requestMatchers(HttpMethod.POST, "/api/v1/twin/proposals",
+                                                "/api/v1/twin/proposals/*/withdraw",
+                                                "/api/v1/twin/proposals/*/assess",
+                                                "/api/v1/twin/proposals/*/submit").hasRole("TWIN_ANALYZE")
+                                        .requestMatchers(HttpMethod.PATCH, "/api/v1/twin/proposals/*").hasRole("TWIN_ANALYZE")
+                                        .requestMatchers(HttpMethod.GET, "/api/v1/twin/proposals",
+                                                "/api/v1/twin/proposals/**").hasRole("TWIN_READ")
                                         .anyRequest().denyAll())
                 .oauth2ResourceServer(
                         oauth2 ->

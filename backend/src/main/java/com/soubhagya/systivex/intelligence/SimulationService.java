@@ -60,7 +60,7 @@ public class SimulationService {
         if (request == null) {
             throw new IllegalArgumentException("Simulation request body is required");
         }
-        ImpactAnalysisService.ParsedInputs inputs =
+        ImpactQueryValidator.ParsedInputs inputs =
                 impactService.parseInputs(
                         request.from(), request.maxDepth(), request.includeTypes());
         List<SystemEntity> starts = inputs.starts();
@@ -78,6 +78,23 @@ public class SimulationService {
                         rootIds,
                         existingEdgeKeys(baselineEdges),
                         raw -> impactService.resolveEntity(raw.trim()).getId());
+
+        return simulateResolved(inputs, baselineEntities, baselineEdges, proposal);
+    }
+
+    /**
+     * Core before/after comparison over caller-loaded snapshot lists with
+     * an already-validated proposal. Public so governed assessment runs
+     * the identical computation over its captured snapshot instead of
+     * reloading the twin mid-assessment.
+     */
+    @Transactional(readOnly = true)
+    public SimulationResponse simulateResolved(
+            ImpactQueryValidator.ParsedInputs inputs,
+            List<SystemEntity> baselineEntities,
+            List<SystemRelationship> baselineEdges,
+            SimulationProposalValidator.ResolvedProposal proposal) {
+        List<SystemEntity> starts = inputs.starts();
 
         ImpactResponse beforeImpact =
                 impactService.analyzeResolved(

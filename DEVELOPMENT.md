@@ -665,3 +665,19 @@ unauthenticated API, and `enabled=false` is rejected. Tests use locally
 generated signing keys (`security/TestJwt.java`) — automated JWT
 coverage, not live identity-provider verification. The four
 target-service APIs are unchanged (open local-only endpoints).
+
+## 17. Governed change proposals (Phase 11 — designed, not implemented)
+
+Design agreed in `DECISIONS.md` D29; no code, migration, or endpoint
+exists yet and none may be claimed. Planned shape: immutable proposal
+revisions addressed by `proposal_key` plus `revision_number`, with the
+JPA optimistic-locking column kept separate and never exposed, under
+`/api/v1/twin/proposals` (propose/assess with `TWIN_ANALYZE`,
+approve/reject with a distinct `TWIN_APPROVER` that `TWIN_ADMIN` does
+not inherit, reads and audit verification with `TWIN_READ`);
+server-recomputed assessment binding with SHA-256 operation and
+fingerprint hashes; policy `DENY` never approvable; 7-day default TTL
+with 30-day maximum and lazy expiry (no scheduler); mandatory reasons;
+hard `(issuer, subject)` separation of duties; a hash-chained audit log
+that is tamper-evident, not tamper-proof; every mutation transactional
+with its audit event; no execution endpoints.

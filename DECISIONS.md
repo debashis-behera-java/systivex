@@ -663,6 +663,91 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
 - **State:** Implemented and tested (see `PROJECT_STATUS.md` Phase 10).
   Live IdP verification pending a configured trusted issuer.
 
+## D29. Governed change proposals and tamper-evident audit — decided (2026-10-15)
+
+- **Decision:** Phase 11 turns an investigated hypothetical change into a
+  governed, auditable proposal with no execution. A new `proposal` package
+  persists immutable proposal revisions and a hash-chained append-only
+  audit log (Flyway `V2`, two tables + chain-head row, no new
+  dependencies). Lifecycle is `DRAFT → ASSESSED → AWAITING_APPROVAL →
+  APPROVED | REJECTED`, with `WITHDRAWN` (proposer cancels),
+  `EXPIRED` (TTL lapsed), and `SUPERSEDED` (amendment forks a new
+  revision) as terminal states; terminal revisions accept no further
+  transitions (409).
+- **Roles and separation of duties:** a distinct `TWIN_APPROVER` role is
+  added to the `allowed-roles` allowlist. `TWIN_ADMIN` does **not**
+  inherit it — a trusted issuer must explicitly grant it, so approval
+  power is never ambient. Propose/assess/submit need `TWIN_ANALYZE`;
+  approve/reject need `TWIN_APPROVER`; reads and audit verification need
+  `TWIN_READ`. Separation of duties is a hard 403 on the `(issuer,
+  subject)` identity pair: the approver must differ from the proposer on
+  every revision, including for identities holding both roles. Approval
+  and rejection both require a written reason (≤1024 chars).
+- **Assessment binding and staleness:** assessment recomputes
+  simulation + policy server-side from caller operations only (the Phase
+  9 trust boundary is unchanged) and stores the canonical operations, a
+  SHA-256 `operationsHash`, the bounded assessment summary
+  (`policy-v1` decision + fired rules, `risk-v1` taxonomy +
+  `snapshotObservedAt`), and a SHA-256 `twinFingerprint`. A policy
+  `DENY` is never approvable in v1 — no override, no break-glass path.
+  Materially stale assessments are rejected before approval (409):
+  structural fingerprint mismatch, risk-level escalation or new
+  staleness on recompute, or lapsed TTL (7-day default, 30-day hard
+  maximum, lazy expiration only — no scheduler).
+- **Revision model (issue A, resolved):** business revisions and JPA
+  concurrency are separate fields. Each amendment inserts a new immutable
+  `proposal_revision` row (`proposal_key` + 1-based `revision_number`,
+  prior row → `SUPERSEDED` in the same transaction); the JPA `@Version`
+  column (`jpa_version`) exists only for optimistic locking and is never
+  serialized, hashed, or exposed. Every approval/audit event references
+  `(proposal_key, revision_number, operationsHash, assessmentHash)`
+  exactly. Prior revisions stay inspectable via
+  `GET /proposals/{key}/revisions[/{n}]`.
+- **Snapshot consistency (issue B, resolved):** assessment loads the
+  twin entity/edge lists once (read-only `REPEATABLE_READ`) and computes
+  simulation, policy, risk, and fingerprint over those exact in-memory
+  lists, so fingerprint and assessment are coherent by construction. The
+  fingerprint is content-derived — sorted entity id/type/name/refs/
+  environment plus structural metadata **minus** the `runtime` subtree,
+  plus sorted relationship keys — never `updated_at`. Content hashing
+  (not writer instrumentation) is what covers every write path: CRUD
+  inserts, sync structural updates, and relationship inserts all change
+  content, while telemetry polls touch only `metadata.runtime` (and
+  `updated_at`, which `entities.save` advances on every run) and therefore
+  never invalidate an assessment. Risk freshness is rechecked separately
+  at approval: recompute risk over current rows for the stored
+  roots/settings and reject on any level increase, new `UNKNOWN`, new
+  staleness, or runtime evidence older than the 30-minute taxonomy
+  threshold. Residual accepted risks: change-then-revert (ABA) content
+  equality, and a millisecond check-then-act window inside the approval
+  transaction (row-locked, human-scale staleness dominates).
+- **Audit integrity:** `audit_event` rows carry actor, action, outcome,
+  correlation ID, timestamp, `(proposal_key, revision_number, hashes)`,
+  and a SHA-256 `event_hash` chained via `prev_hash` against a
+  `SELECT … FOR UPDATE`-guarded `audit_chain_head` row. Every lifecycle
+  mutation and its audit event commit in one transaction (audit failure
+  rolls back the mutation). There is no audit deletion and no automatic
+  repair. The chain is tamper-**evident**, not tamper-proof: a database
+  superuser can rewrite records, and the `verify` endpoint exists to
+  detect exactly that (`OK` vs `BROKEN_AT_SEQ`).
+- **Out of scope:** execution endpoints, controlled dispatch, approver
+  quorum > 1, DENY override, break-glass, schedulers, brokers, workflow
+  engines, WORM/offline export (runbook-only), and target-service
+  authentication are explicitly not introduced here. `APPROVED` is a
+  terminal record — acting on it stays a human step outside the system.
+- **Verification:** migration-compat, transition-matrix, concurrency
+  (parallel approves → exactly one `APPROVED`), role×endpoint matrix,
+  SoD, expiry with injectable clock, chain-tamper detection, and
+  transaction-rollback tests (see `PROJECT_STATUS.md` Phase 11). No live
+  IdP or live Prometheus verification is claimed.
+- **Rationale:** closes the governance gap between advisory investigation
+  (Phases 5–9) and any future controlled execution, using the smallest
+  reviewable persistence + cryptography increment while keeping the
+  LLM permanently out of authorization and execution paths.
+- **State:** Designed and recorded (see `PROJECT_STATUS.md` Phase 11).
+  Implementation pending — nothing in this decision may be claimed as
+  built until its slice lands with green tests.
+
 ## Supersession rule
 
 New decisions amend this file with date and rationale; they never silently edit
