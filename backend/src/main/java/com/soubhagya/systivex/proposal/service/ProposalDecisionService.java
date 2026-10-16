@@ -16,7 +16,6 @@ import com.soubhagya.systivex.twin.model.SystemEntityType;
 import com.soubhagya.systivex.twin.model.SystemRelationship;
 import com.soubhagya.systivex.twin.repository.SystemEntityRepository;
 import com.soubhagya.systivex.twin.repository.SystemRelationshipRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -54,8 +53,6 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Service
 public class ProposalDecisionService {
-
-    static final Duration HARD_MAX_TTL = Duration.ofDays(30);
 
     private final ProposalRevisionRepository revisions;
 
@@ -136,13 +133,9 @@ public class ProposalDecisionService {
                 || latest.getExpiresAt() == null) {
             throw new ProposalConflictException("Assessment evidence is incomplete");
         }
-        Instant effectiveExpiry = latest.getExpiresAt();
-        Instant hardMax = latest.getCreatedAt().plus(HARD_MAX_TTL);
-        if (hardMax.isBefore(effectiveExpiry)) {
-            effectiveExpiry = hardMax;
-        }
+        Instant effectiveExpiry = ProposalExpiry.effectiveExpiry(latest);
         if (!effectiveExpiry.isAfter(Instant.now())) {
-            markExpired(latest, issuer, subject);
+            ProposalExpiry.markExpired(revisions, audits, latest, issuer, subject);
             throw new ProposalExpiredException(
                     "Proposal assessment has expired; amend to reassess");
         }
@@ -182,27 +175,6 @@ public class ProposalDecisionService {
                         decisionReason,
                         UUID.randomUUID().toString()));
         return ProposalResponse.from(latest);
-    }
-
-    private void markExpired(ProposalRevision latest, String issuer, String subject) {
-        latest.setStatus(ProposalStatus.EXPIRED);
-        try {
-            revisions.saveAndFlush(latest);
-        } catch (ConcurrencyFailureException e) {
-            throw new ProposalConflictException("Proposal was modified concurrently; refetch and retry");
-        }
-        audits.append(
-                new AuditService.AuditAppend(
-                        issuer,
-                        subject,
-                        AuditAction.EXPIRED,
-                        AuditOutcome.SUCCESS,
-                        latest.getProposalKey(),
-                        latest.getRevisionNumber(),
-                        latest.getOperationsHash(),
-                        latest.getAssessmentHash(),
-                        null,
-                        UUID.randomUUID().toString()));
     }
 
     private void recheckRisk(

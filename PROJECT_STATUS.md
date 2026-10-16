@@ -123,8 +123,8 @@ audit service + verify endpoint tests green)
   rolls back the draft, zero rows left). Fixtures namespaced and
   removed; no exact-timestamp assertions. Every code file under 400
   lines; no new dependencies.
-- [ ] Still pending: expiry handling (S6). Approval/rejection
-  landed in S5 below; none of S6 exists yet and none is claimed.
+- [x] Expiry handling landed in S6 below (submit-path lazy
+  expiry); approval/rejection landed in S5 below.
 
 ## Phase 11 S4 — Assessment, submission & amendments (implemented
 2026-10-16; code + Testcontainers/API tests written; automated
@@ -202,8 +202,7 @@ verification partial — see limits below)
   Docker recovered, the full `./mvnw clean test` ran green
   (367 tests, 0 failures — see the S1–S4 checkpoint commit
   `8f2b2d2`). Live verification not performed.
-- [ ] Still pending: expiry handling (S6). None of it exists yet
-  and none is claimed.
+- [x] Expiry handling landed in S6 below (submit-path lazy expiry).
 
 ## Phase 11 S5 — Governed approval and rejection (implemented
 2026-10-16; full suite green, no live IdP verification)
@@ -270,9 +269,48 @@ verification partial — see limits below)
   with the 409 (new non-rolling-back `ProposalExpiredException`
   → same 409 contract), and snapshot-isolation serialization
   aborts surfaced as 500 (now mapped to 409 alongside optimistic
-  locks, including the same latent path in `assess`).
-- [ ] Still pending: expiry handling (S6). None of it exists yet
-  and none is claimed.
+   locks, including the same latent path in `assess`).
+- [x] S6 generalized this slice's lazy expiry to submission (see
+  Phase 11 S6 below); no broader expiry sweep exists nor is one
+  claimed (D29 forbids schedulers).
+
+## Phase 11 S6 — Submit-path lazy expiry (implemented
+2026-10-16; full suite green, no live IdP verification)
+
+- [x] Submission enforces exactly the decision path's expiration
+  rule: `effectiveExpiry = min(expires_at, revision.createdAt +
+  30 days)`, so each amendment starts a fresh revision lifecycle.
+  A lapsed TTL no longer ends in a bare 409 — the revision is
+  persisted as `EXPIRED` with its `EXPIRED` audit event (actor,
+  key/revision, evidence hashes) in one atomic commit, and the
+  request returns 409 through the existing non-rolling-back
+  `ProposalExpiredException`. Audit-append failure rolls the
+  expiry marking back completely (still `ASSESSED`, no partial
+  event). Shared, narrow `proposal/service/ProposalExpiry`
+  helper serves both paths (no logic duplicated, same
+  transaction semantics, no new bean dependencies); amendment
+  stays TTL-agnostic as the recovery path (lapsed `ASSESSED` →
+  new `DRAFT` → reassess → resubmit with expiry anchored to the
+  new revision); reads stay pure with no expiry writes or
+  computed-expiry fields. No scheduler, no sweep, no new
+  dependencies, no DENY/execution changes.
+- [x] Tests: 6 new/updated, full suite green —
+  `ProposalSubmitExpiryTest` 5 (expired submit persists
+  `EXPIRED` + event with matching hashes and returns 409;
+  30-day hard max binds submit despite a later `expires_at`;
+  valid submit still succeeds; amendment recovers a lapsed
+  assessment as revision 2 with fresh 7-day expiry and clean
+  resubmission; all read endpoints leave row counts, audit
+  counts, and status untouched);
+  `ProposalMutationRollbackTest` +1 (submit-expiry audit
+  failure keeps `ASSESSED` with no partial event); S4
+  `submitRejectsMismatchInvalidStateAndExpiry` updated to the
+  approved S6 contract (expired submit marks `EXPIRED`; the
+  terminal revision stays unsubmittable — one redundant
+  duplicate assertion removed, no coverage lost). Full
+  `./mvnw clean test`: **398 tests, 0 failures, 0 errors**;
+  `package -DskipTests` builds; `git diff --check` clean. Every
+  changed/new code file under 400 lines.
 
 ## What is complete (Phase 10, 2026-10-15 — implementation + automated tests complete)
 

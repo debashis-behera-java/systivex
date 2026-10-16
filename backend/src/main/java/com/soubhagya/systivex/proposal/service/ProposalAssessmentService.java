@@ -3,6 +3,7 @@ package com.soubhagya.systivex.proposal.service;
 import com.soubhagya.systivex.intelligence.ImpactAnalysisService;
 import com.soubhagya.systivex.intelligence.ImpactQueryValidator;
 import com.soubhagya.systivex.intelligence.ProposalConflictException;
+import com.soubhagya.systivex.intelligence.ProposalExpiredException;
 import com.soubhagya.systivex.intelligence.RiskResponse;
 import com.soubhagya.systivex.intelligence.SimulationOperation;
 import com.soubhagya.systivex.intelligence.SimulationProposalValidator;
@@ -157,7 +158,13 @@ public class ProposalAssessmentService {
         return ProposalResponse.from(latest);
     }
 
-    @Transactional
+    /**
+     * Submission shares the decision path's lazy-expiry rule: a lapsed
+     * TTL persists {@code EXPIRED} plus its audit event while the
+     * submission itself is refused with 409, so the expiry outcome
+     * commits instead of rolling back.
+     */
+    @Transactional(noRollbackFor = ProposalExpiredException.class)
     public ProposalResponse submit(UUID proposalKey, SubmitRequest request, String issuer, String subject) {
         requireIdentity(issuer, subject);
         if (request == null) {
@@ -188,11 +195,14 @@ public class ProposalAssessmentService {
         }
         if (latest.getTwinFingerprint() == null
                 || latest.getPolicyDecision() == null
-                || latest.getSnapshotObservedAt() == null) {
+                || latest.getSnapshotObservedAt() == null
+                || latest.getExpiresAt() == null) {
             throw new ProposalConflictException("Assessment evidence is incomplete");
         }
-        if (latest.getExpiresAt() == null || !latest.getExpiresAt().isAfter(Instant.now())) {
-            throw new ProposalConflictException("Proposal assessment has expired; amend to reassess");
+        if (!ProposalExpiry.effectiveExpiry(latest).isAfter(Instant.now())) {
+            ProposalExpiry.markExpired(revisions, audits, latest, issuer, subject);
+            throw new ProposalExpiredException(
+                    "Proposal assessment has expired; amend to reassess");
         }
         latest.setStatus(ProposalStatus.AWAITING_APPROVAL);
         try {

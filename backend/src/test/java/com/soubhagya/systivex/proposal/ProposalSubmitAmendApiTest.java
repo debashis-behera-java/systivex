@@ -204,10 +204,10 @@ class ProposalSubmitAmendApiTest extends AbstractPostgresIntegrationTest {
         assertThat(call(HttpMethod.POST, "/api/v1/twin/proposals/" + key + "/submit", analyst,
                         valid).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(body(call(HttpMethod.GET, "/api/v1/twin/proposals/" + key,
+                        token("TWIN_READ"), null)).get("status").asText())
+                .isEqualTo("EXPIRED");
         jdbc.update("UPDATE proposal_revision SET expires_at = now() + interval '1 hour'");
-        assertThat(call(HttpMethod.POST, "/api/v1/twin/proposals/" + key + "/submit", analyst,
-                        valid).getStatusCode())
-                .isEqualTo(HttpStatus.OK);
         assertThat(call(HttpMethod.POST, "/api/v1/twin/proposals/" + key + "/submit", analyst,
                         valid).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);

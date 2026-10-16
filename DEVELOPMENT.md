@@ -669,7 +669,7 @@ generated signing keys (`security/TestJwt.java`) — automated JWT
 coverage, not live identity-provider verification. The four
 target-service APIs are unchanged (open local-only endpoints).
 
-## 17. Governed change proposals (Phase 11 — S1–S5 implemented, S6 pending)
+## 17. Governed change proposals (Phase 11 — S1–S6 implemented)
 
 Design agreed in `DECISIONS.md` D29; slices S1–S5 implemented with
 green tests (see `PROJECT_STATUS.md`): immutable proposal

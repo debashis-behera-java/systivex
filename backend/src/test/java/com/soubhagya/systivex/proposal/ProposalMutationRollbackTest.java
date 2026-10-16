@@ -15,6 +15,7 @@ import com.soubhagya.systivex.proposal.repository.AuditChainHeadRepository;
 import com.soubhagya.systivex.proposal.repository.AuditEventRepository;
 import com.soubhagya.systivex.proposal.repository.ProposalRevisionRepository;
 import com.soubhagya.systivex.proposal.service.AuditService;
+import com.soubhagya.systivex.proposal.service.AuditVerification;
 import com.soubhagya.systivex.proposal.service.ProposalAmendmentService;
 import com.soubhagya.systivex.proposal.service.ProposalAssessmentService;
 import com.soubhagya.systivex.proposal.service.ProposalDecisionService;
@@ -271,5 +272,28 @@ class ProposalMutationRollbackTest extends AbstractPostgresIntegrationTest {
         ProposalRevision stored = revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow();
         assertThat(stored.getStatus()).isEqualTo(ProposalStatus.AWAITING_APPROVAL);
         assertThat(events.count()).isEqualTo(2);
+    }
+
+    @Test
+    void submitExpiryRollbackKeepsAssessed() {
+        UUID key = draftRevision();
+        ProposalAssessmentService real = realAssessments();
+        new TransactionTemplate(transactions)
+                .execute(status -> real.assess(key, ISSUER, "subject"));
+        jdbc.update("UPDATE proposal_revision SET expires_at = now() - interval '1 hour'"
+                + " WHERE proposal_key = ?", key);
+        ProposalRevision assessed =
+                revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow();
+        SubmitRequest submit = new SubmitRequest(assessed.getRevisionNumber(),
+                assessed.getOperationsHash(), assessed.getAssessmentHash());
+        ProposalAssessmentService assessments = failingAssessments();
+        assertThatThrownBy(() -> new TransactionTemplate(transactions)
+                        .execute(status -> assessments.submit(key, submit, ISSUER, "subject")))
+                .isInstanceOf(IllegalStateException.class);
+
+        ProposalRevision stored = revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(ProposalStatus.ASSESSED);
+        assertThat(events.count()).isEqualTo(1);
+        assertThat(audits.verify().status()).isEqualTo(AuditVerification.OK);
     }
 }
