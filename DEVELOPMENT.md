@@ -641,11 +641,14 @@ D28). Every `/api/v1/twin/*` call and `/actuator/prometheus` needs a
 | Twin/impact/risk GETs | `TWIN_READ` |
 | Twin entity/relationship POSTs | `TWIN_ADMIN` |
 | Simulations, policy-evaluations | `TWIN_ANALYZE` |
+| Proposal drafts, assessment, submission, amendment | `TWIN_ANALYZE` |
+| Proposal approve/reject (Phase 11 S5) | `TWIN_APPROVER` (never inherited from `TWIN_ADMIN`) |
 | Sync, observations | `TWIN_OPERATOR` (+ loopback guard, still authoritative) |
 | `GET /actuator/health` | anonymous (status only) |
 | `GET /actuator/prometheus` | `TWIN_READ` |
 
-`TWIN_ADMIN` inherits the other three roles. Missing/invalid tokens get
+`TWIN_ADMIN` inherits the other three operational roles, never
+`TWIN_APPROVER`. Missing/invalid tokens get
 401, valid tokens without the role get 403. Configuration
 (`application.example.properties`, never committed with secrets):
 
@@ -656,7 +659,7 @@ systivex.security.jwt.jwk-set-uri=${SYSTIVEX_JWK_SET_URI:}
 systivex.security.jwt.accepted-audience=systivex
 systivex.security.jwt.role-claim=roles
 systivex.security.jwt.clock-skew-seconds=60
-systivex.security.jwt.allowed-roles=TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN
+systivex.security.jwt.allowed-roles=TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN,TWIN_APPROVER
 ```
 
 Set `$env:SYSTIVEX_ISSUER_URI="https://<trusted-issuer>"` before
@@ -666,13 +669,13 @@ generated signing keys (`security/TestJwt.java`) — automated JWT
 coverage, not live identity-provider verification. The four
 target-service APIs are unchanged (open local-only endpoints).
 
-## 17. Governed change proposals (Phase 11 — designed, not implemented)
+## 17. Governed change proposals (Phase 11 — S1–S5 implemented, S6 pending)
 
-Design agreed in `DECISIONS.md` D29; no code, migration, or endpoint
-exists yet and none may be claimed. Planned shape: immutable proposal
+Design agreed in `DECISIONS.md` D29; slices S1–S5 implemented with
+green tests (see `PROJECT_STATUS.md`): immutable proposal
 revisions addressed by `proposal_key` plus `revision_number`, with the
 JPA optimistic-locking column kept separate and never exposed, under
-`/api/v1/twin/proposals` (propose/assess with `TWIN_ANALYZE`,
+`/api/v1/twin/proposals` (propose/assess/submit/amend with `TWIN_ANALYZE`,
 approve/reject with a distinct `TWIN_APPROVER` that `TWIN_ADMIN` does
 not inherit, reads and audit verification with `TWIN_READ`);
 server-recomputed assessment binding with SHA-256 operation and

@@ -248,7 +248,9 @@ itself a place data can leak. The following holds for the current pipeline
   from a configured trusted issuer (see `DECISIONS.md` D28): missing or
   invalid credentials are 401, authenticated identities without the
   required role are 403, and unknown/malformed role claims grant
-  nothing (`TWIN_ADMIN` inherits the three lesser roles). The sync and
+  nothing (`TWIN_ADMIN` inherits the three lesser roles — never
+  `TWIN_APPROVER`, which Phase 11 S5 added to the allowlist for
+  explicit grant only). The sync and
   observation loopback guards stay authoritative behind the
   `TWIN_OPERATOR` role — a valid operator token from a non-loopback peer
   is still refused, and `X-Forwarded-For` remains untrusted input.
@@ -278,8 +280,8 @@ itself a place data can leak. The following holds for the current pipeline
 - Twin-connector authentication and data-integrity guarantees.
 - Approval UX and delegation model (governance design agreed in
   `DECISIONS.md` D29 — distinct `TWIN_APPROVER`, hard separation of
-  duties, DENY-never-approvable; implementation pending, none of it may
-  be claimed as built); risk-classification taxonomy.
+  duties, DENY-never-approvable; approval/rejection implemented in
+  Phase 11 S5, expiry handling still pending); risk-classification taxonomy.
 - Execution sandboxing, blast-radius limits, rollback/verification loops.
 - Persistence hardening and audit-log immutability (twin tables exist
   now; the audit chain is designed in `DECISIONS.md` D29 as

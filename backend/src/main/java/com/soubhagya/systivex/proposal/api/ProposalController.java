@@ -2,6 +2,7 @@ package com.soubhagya.systivex.proposal.api;
 
 import com.soubhagya.systivex.proposal.service.ProposalAmendmentService;
 import com.soubhagya.systivex.proposal.service.ProposalAssessmentService;
+import com.soubhagya.systivex.proposal.service.ProposalDecisionService;
 import com.soubhagya.systivex.proposal.service.ProposalService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -20,12 +21,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Governed proposals (Phase 11 S3–S4, D29).
+ * Governed proposals (Phase 11 S3–S5, D29).
  *
  * <p>Actor identity always comes from the validated JWT — request bodies
- * never carry proposer or approver identity. This slice adds assessment,
- * submission, and amendment to the S3 drafts, withdrawal, and reads;
- * approval and rejection arrive later.
+ * never carry proposer or approver identity. Assessment, submission, and
+ * amendment (S4) precede the approver decision (S5): approval and
+ * rejection require the explicit `TWIN_APPROVER` role, a written reason,
+ * and a fresh non-DENY assessment. An `APPROVED` record authorizes a later
+ * controlled-execution phase; it executes nothing itself.
  */
 @RestController
 @RequestMapping("/api/v1/twin/proposals")
@@ -37,13 +40,17 @@ public class ProposalController {
 
     private final ProposalAmendmentService amendments;
 
+    private final ProposalDecisionService decisions;
+
     public ProposalController(
             ProposalService proposals,
             ProposalAssessmentService assessments,
-            ProposalAmendmentService amendments) {
+            ProposalAmendmentService amendments,
+            ProposalDecisionService decisions) {
         this.proposals = proposals;
         this.assessments = assessments;
         this.amendments = amendments;
+        this.decisions = decisions;
     }
 
     @PostMapping
@@ -93,6 +100,30 @@ public class ProposalController {
                 subjectOf(authentication),
                 isAdmin(authentication),
                 request);
+    }
+
+    @PostMapping("/{key}/approve")
+    public ProposalResponse approve(
+            @PathVariable UUID key,
+            @Valid @RequestBody DecisionRequest request,
+            JwtAuthenticationToken authentication) {
+        return decisions.approve(
+                key,
+                request.reason(),
+                issuerOf(authentication),
+                subjectOf(authentication));
+    }
+
+    @PostMapping("/{key}/reject")
+    public ProposalResponse reject(
+            @PathVariable UUID key,
+            @Valid @RequestBody DecisionRequest request,
+            JwtAuthenticationToken authentication) {
+        return decisions.reject(
+                key,
+                request.reason(),
+                issuerOf(authentication),
+                subjectOf(authentication));
     }
 
     @GetMapping

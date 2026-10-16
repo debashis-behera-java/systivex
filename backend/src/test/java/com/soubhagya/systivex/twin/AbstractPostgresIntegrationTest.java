@@ -33,6 +33,6 @@ public abstract class AbstractPostgresIntegrationTest {
         registry.add("systivex.security.jwt.role-claim", () -> "roles");
         registry.add("systivex.security.jwt.clock-skew-seconds", () -> 60L);
         registry.add("systivex.security.jwt.allowed-roles", () ->
-                "TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN");
+                "TWIN_READ,TWIN_ANALYZE,TWIN_OPERATOR,TWIN_ADMIN,TWIN_APPROVER");
     }
 }

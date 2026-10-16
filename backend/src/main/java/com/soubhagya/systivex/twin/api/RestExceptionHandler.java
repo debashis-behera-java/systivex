@@ -5,9 +5,11 @@ import com.soubhagya.systivex.observation.SyncForbiddenException;
 import com.soubhagya.systivex.telemetry.ObservationForbiddenException;
 import com.soubhagya.systivex.twin.service.EntityNotFoundException;
 import com.soubhagya.systivex.intelligence.ProposalConflictException;
+import com.soubhagya.systivex.intelligence.ProposalExpiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -72,6 +74,30 @@ public class RestExceptionHandler {
                 HttpStatus.CONFLICT.value(),
                 HttpStatus.CONFLICT.getReasonPhrase(),
                 ex.getMessage(),
+                request.getRequestURI(),
+                null);
+    }
+
+    @ExceptionHandler(ProposalExpiredException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleProposalExpired(
+            ProposalExpiredException ex, HttpServletRequest request) {
+        return ErrorResponse.of(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null);
+    }
+
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleConcurrencyFailure(
+            ConcurrencyFailureException ex, HttpServletRequest request) {
+        return ErrorResponse.of(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                "Request conflicts with a concurrent modification; refetch and retry",
                 request.getRequestURI(),
                 null);
     }

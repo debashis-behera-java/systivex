@@ -22,7 +22,8 @@ public class SystivexSecurityProperties {
 
     private Set<String> allowedRoles =
             new LinkedHashSet<>(
-                    Set.of("TWIN_READ", "TWIN_ANALYZE", "TWIN_OPERATOR", "TWIN_ADMIN"));
+                    Set.of("TWIN_READ", "TWIN_ANALYZE", "TWIN_OPERATOR", "TWIN_ADMIN",
+                            "TWIN_APPROVER"));
 
     public boolean isEnabled() {
         return enabled;

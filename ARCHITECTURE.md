@@ -290,7 +290,9 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
   `/api/v1/twin/*` surface requires JWT bearer tokens —
   twin/impact/risk GETs `TWIN_READ`, twin POSTs `TWIN_ADMIN`,
   simulations/policy-evaluations `TWIN_ANALYZE`, sync/observations
-  `TWIN_OPERATOR` (loopback guard still authoritative);
+  `TWIN_OPERATOR` (loopback guard still authoritative), proposal
+  approve/reject `TWIN_APPROVER` (Phase 11 S5; never inherited from
+  `TWIN_ADMIN`);
   `GET /actuator/health` anonymous (status only),
   `/actuator/prometheus` requires `TWIN_READ`, all else denied.
 - **SSE** for streaming long-running analysis/simulation progress (planned).
@@ -381,8 +383,10 @@ Implemented:
   the control plane (new `security` package); fail-closed
   `systivex.security.jwt.*` configuration (trusted issuer mandatory, no
   security-off mode); allowlist-only role mapping with `TWIN_ADMIN`
-  inheritance; per-endpoint role policy with loopback guards still
-  authoritative behind `TWIN_OPERATOR`; anonymous status-only health,
+  inheritance (never `TWIN_APPROVER` — Phase 11 S5 approval/rejection
+  endpoints require that explicitly granted role); per-endpoint role
+  policy with loopback guards still authoritative behind
+  `TWIN_OPERATOR`; anonymous status-only health,
   `TWIN_READ`-restricted Prometheus metrics, deny-by-default otherwise
   (see `DECISIONS.md` D28). Automated JWT tests use local test keys
   only — live IdP verification pending a configured trusted issuer.

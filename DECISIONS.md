@@ -744,9 +744,9 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   (Phases 5–9) and any future controlled execution, using the smallest
   reviewable persistence + cryptography increment while keeping the
   LLM permanently out of authorization and execution paths.
-- **State:** Designed and recorded (see `PROJECT_STATUS.md` Phase 11).
-  Implementation pending — nothing in this decision may be claimed as
-  built until its slice lands with green tests.
+- **State:** Slices S1–S5 implemented with green tests (see
+  `PROJECT_STATUS.md` Phase 11); expiry handling (S6) pending —
+  nothing in S6 may be claimed as built until its slice lands.
 
 ## Supersession rule
 

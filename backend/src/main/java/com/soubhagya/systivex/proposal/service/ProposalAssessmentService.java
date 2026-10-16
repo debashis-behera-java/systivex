@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
-import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,8 +50,8 @@ import tools.jackson.databind.json.JsonMapper;
  * stored canonical operations feed the computation; the request carries
  * no assessment, risk, policy, or delta fields to trust. Submission is a
  * guarded transition binding the caller's revision and hashes to the
- * exact stored assessment. Approval, rejection, and expiry sweeps arrive
- * in later slices.
+ * exact stored assessment. Approval and rejection arrive in a later
+ * slice (S5); expiry sweeps arrive later still.
  */
 @Service
 public class ProposalAssessmentService {
@@ -139,7 +139,7 @@ public class ProposalAssessmentService {
         latest.setStatus(ProposalStatus.ASSESSED);
         try {
             revisions.saveAndFlush(latest);
-        } catch (OptimisticLockingFailureException e) {
+        } catch (ConcurrencyFailureException e) {
             throw new ProposalConflictException("Proposal was modified concurrently; refetch and retry");
         }
         audits.append(
@@ -197,7 +197,7 @@ public class ProposalAssessmentService {
         latest.setStatus(ProposalStatus.AWAITING_APPROVAL);
         try {
             revisions.saveAndFlush(latest);
-        } catch (OptimisticLockingFailureException e) {
+        } catch (ConcurrencyFailureException e) {
             throw new ProposalConflictException("Proposal was modified concurrently; refetch and retry");
         }
         audits.append(

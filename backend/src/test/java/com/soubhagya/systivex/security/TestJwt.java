@@ -39,6 +39,23 @@ public final class TestJwt {
         return token(ISSUER, AUDIENCE, roles, Duration.ofHours(1));
     }
 
+    /** Fixed-subject token for separation-of-duties tests. */
+    public static String tokenWithSubject(String subject, List<String> roles) {
+        return tokenWithSubject(ISSUER, subject, roles);
+    }
+
+    /** Fixed issuer-and-subject token for identity-pair tests. */
+    public static String tokenWithSubject(String issuer, String subject, List<String> roles) {
+        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
+                .subject(subject)
+                .issuer(issuer == null ? ISSUER : issuer)
+                .audience(AUDIENCE)
+                .claim("roles", roles)
+                .expirationTime(Date.from(Instant.now().plus(Duration.ofHours(1))))
+                .notBeforeTime(Date.from(Instant.now().minusSeconds(30)));
+        return sign(builder.build(), SIGNING_KEY);
+    }
+
     public static String token(String issuer, String audience, List<String> roles, Duration validity) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
                 .subject("test-subject-" + UUID.randomUUID())

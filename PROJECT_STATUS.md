@@ -123,8 +123,8 @@ audit service + verify endpoint tests green)
   rolls back the draft, zero rows left). Fixtures namespaced and
   removed; no exact-timestamp assertions. Every code file under 400
   lines; no new dependencies.
-- [ ] Still pending: approval/rejection with `TWIN_APPROVER` (S5),
-  expiry handling (S6). None of these exist yet and none are claimed.
+- [ ] Still pending: expiry handling (S6). Approval/rejection
+  landed in S5 below; none of S6 exists yet and none is claimed.
 
 ## Phase 11 S4 — Assessment, submission & amendments (implemented
 2026-10-16; code + Testcontainers/API tests written; automated
@@ -196,20 +196,83 @@ verification partial — see limits below)
   file under 400 lines; no new dependencies; `TWIN_APPROVER` not
   added.
 - [ ] AUTOMATED VERIFICATION LIMITS (2026-10-16): the three S4
-  suites above were not executed green in this session — the
-  Docker daemon is down (`docker ps` cannot reach
-  `dockerDesktopLinuxEngine`), so Testcontainers cannot start
-  PostgreSQL (`Could not find a valid Docker environment`) and all
-  19 S4 integration tests error at container startup. Verified
-  instead: `test-compile` clean; 143 Docker-free unit tests green
-  (intelligence/policy/traversal/controller/security/parser
-  suites incl. the exact simulation/impact/risk/policy algorithms
-  assessment reuses); `package -DskipTests` builds;
-  `git diff --check` clean. Full `./mvnw clean test` was not
-  green in this environment (blocked on Docker, not on code) and
-  is not claimed. Live verification not performed.
-- [ ] Still pending: approval/rejection with `TWIN_APPROVER` (S5),
-  expiry handling (S6). None of these exist yet and none are claimed.
+  suites above were not executed green in the session that wrote
+  them — the Docker daemon was down, so all 19 S4 integration tests
+  errored at container startup. Closed later the same day: with
+  Docker recovered, the full `./mvnw clean test` ran green
+  (367 tests, 0 failures — see the S1–S4 checkpoint commit
+  `8f2b2d2`). Live verification not performed.
+- [ ] Still pending: expiry handling (S6). None of it exists yet
+  and none is claimed.
+
+## Phase 11 S5 — Governed approval and rejection (implemented
+2026-10-16; full suite green, no live IdP verification)
+
+- [x] `POST /api/v1/twin/proposals/{key}/approve` and
+  `.../reject` (`TWIN_APPROVER` only): `AWAITING_APPROVAL` only
+  (409 otherwise, including repeat/conflicting decisions);
+  mandatory written reason (`@NotBlank`, ≤1024 → 400 otherwise,
+  stored trimmed); actor identity from the JWT. SoD is a hard 403
+  on the `(issuer, subject)` pair — the proposer can never decide
+  their own revision, even holding both roles. Decision and its
+  `APPROVED`/`REJECTED` audit event (actor, key/revision,
+  ops+assessment hashes, reason) commit in one `REPEATABLE_READ`
+  transaction; audit failure rolls the decision back. Optimistic
+  locking plus unique revision numbers serialize concurrent
+  decisions (parallel approves → exactly one `APPROVED`, loser
+  409; serialization aborts under snapshot isolation also map to
+  409, never 500). `APPROVED` is a terminal record — permission
+  for a later controlled-execution phase, never execution itself:
+  no tools run, no target services change, no deployments trigger.
+- [x] Approval-only gates (rejection stays permissive): stored
+  hashes re-verified; `DENY` never approvable (409, no override);
+  lazy expiry enforced (7-day default `expires_at`, 30-day hard
+  maximum from revision creation — whichever lapses first marks
+  the revision `EXPIRED` with an `EXPIRED` audit event in the same
+  commit and returns 409 via a non-rolling-back expiry failure);
+  structural fingerprint recomputed over one snapshot and
+  compared (mismatch → 409, never silent refresh); risk
+  reclassified over current rows for the stored roots/settings
+  (`RiskService.assessResolved`, widened to public, no logic
+  change) — level escalation (incl. arrival at `HIGH`), new
+  `UNKNOWN`, or new staleness each reject with 409. Runtime-only
+  changes keep the fingerprint but fail the risk recheck, proving
+  the two freshness channels stay separate. Stale proposals must
+  be amended, reassessed, and resubmitted.
+- [x] `TWIN_APPROVER` authorization: added to the `allowed-roles`
+  allowlist (defaults, example properties, test harness);
+  `TWIN_ADMIN` does **not** inherit it (converter unchanged,
+  proven by tests); approve/reject matchers require
+  `TWIN_APPROVER`; default-deny, stateless JWT, fixed error
+  bodies unchanged. No live IdP verification (test signing keys
+  only, as before).
+- [x] Tests: 22 new, full suite green — `ProposalDecisionApiTest`
+  9 (happy approve/reject with identity+reason+audit, 400
+  reason matrix, 401/403 role matrix incl. admin-without-approver,
+  self/dual-role 403s, `(issuer, subject)` pair proof via direct
+  service call, wrong-status 409s, DENY approve-409 with
+  reject-allowed); `ProposalDecisionFreshnessTest` 7
+  (fingerprint mismatch, runtime-only staleness with unchanged
+  fingerprint, escalation, TTL expiry with `EXPIRED` marking,
+  30-day hard max, concurrent approves → one winner, decided
+  revisions unamendable); `ProposalMutationRollbackTest` +2
+  (approve/reject audit-failure rollback);
+  `JwtGrantedAuthoritiesConverterTest` +2 (explicit approver
+  grant, no admin inheritance);
+  `SecurityAuthorizationApiTest` +1 (approver-only endpoints:
+  401/403 matrix, approver passes authz). Full
+  `./mvnw clean test`: **388 tests, 0 failures, 0 errors**
+  (367 pre-existing + 21 new);
+  `package -DskipTests` builds; `git diff --check` clean. Every
+  changed/new code file under 400 lines; no new dependencies, no
+  scheduler, no execution. Two genuine defects found and fixed
+  without weakening assertions: lazy-expiry state rolled back
+  with the 409 (new non-rolling-back `ProposalExpiredException`
+  → same 409 contract), and snapshot-isolation serialization
+  aborts surfaced as 500 (now mapped to 409 alongside optimistic
+  locks, including the same latent path in `assess`).
+- [ ] Still pending: expiry handling (S6). None of it exists yet
+  and none is claimed.
 
 ## What is complete (Phase 10, 2026-10-15 — implementation + automated tests complete)
 

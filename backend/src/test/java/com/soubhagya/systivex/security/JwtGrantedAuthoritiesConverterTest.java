@@ -12,13 +12,14 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Allowlist-only role mapping: only configured roles become authorities,
- * malformed claims grant nothing, unknown values never grant access, and
- * TWIN_ADMIN inherits READ, ANALYZE, and OPERATOR.
+ * malformed claims grant nothing, unknown values never grant access,
+ * TWIN_ADMIN inherits READ, ANALYZE, and OPERATOR — never TWIN_APPROVER,
+ * which a trusted issuer must grant explicitly.
  */
 class JwtGrantedAuthoritiesConverterTest {
 
     private static final Set<String> ALLOWED =
-            Set.of("TWIN_READ", "TWIN_ANALYZE", "TWIN_OPERATOR", "TWIN_ADMIN");
+            Set.of("TWIN_READ", "TWIN_ANALYZE", "TWIN_OPERATOR", "TWIN_ADMIN", "TWIN_APPROVER");
 
     private final JwtGrantedAuthoritiesConverter converter =
             new JwtGrantedAuthoritiesConverter("roles", ALLOWED);
@@ -57,6 +58,21 @@ class JwtGrantedAuthoritiesConverterTest {
                 .containsExactlyInAnyOrder(
                         "ROLE_TWIN_ADMIN", "ROLE_TWIN_READ",
                         "ROLE_TWIN_ANALYZE", "ROLE_TWIN_OPERATOR");
+    }
+
+    @Test
+    void approverIsGrantedOnlyWhenExplicitlyPresent() {
+        assertThat(names(converter.convert(jwtWithClaim(List.of("TWIN_APPROVER")))))
+                .containsExactly("ROLE_TWIN_APPROVER");
+    }
+
+    @Test
+    void adminNeverImpliesApprover() {
+        assertThat(names(converter.convert(jwtWithClaim(List.of("TWIN_ADMIN")))))
+                .doesNotContain("ROLE_TWIN_APPROVER");
+        assertThat(names(converter.convert(
+                        jwtWithClaim(List.of("TWIN_ADMIN", "TWIN_APPROVER")))))
+                .contains("ROLE_TWIN_APPROVER");
     }
 
     @Test

@@ -64,10 +64,11 @@ public class RiskService {
 
     /**
      * Reuse the traversal for a caller-supplied (baseline or hypothetical)
-     * graph snapshot. Package-private so simulation reuses classification
-     * without duplicating it.
+     * graph snapshot. Public so simulation reuses classification without
+     * duplicating it, and so governed approval rechecks risk freshness over
+     * its captured snapshot with the stored roots and settings.
      */
-    RiskResponse assessResolved(
+    public RiskResponse assessResolved(
             List<SystemEntity> starts,
             int maxDepth,
             Set<SystemEntityType> includeTypes,

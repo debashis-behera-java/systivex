@@ -274,4 +274,20 @@ class SecurityAuthorizationApiTest extends AbstractPostgresIntegrationTest {
                         List.of("target-service:order-service"), "operations", List.of()));
         assertThat(advisory.getBody()).contains("NOT AN AUTHORIZATION");
     }
+
+    @Test
+    void decisionEndpointsNeedExplicitApprover() {
+        String ghost = "/api/v1/twin/proposals/" + UUID.randomUUID() + "/approve";
+        Map<String, Object> reason = Map.of("reason", "matrix");
+        assertThat(call(HttpMethod.POST, ghost, null, reason).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(call(HttpMethod.POST, ghost, token("TWIN_READ"), reason).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(call(HttpMethod.POST, ghost, token("TWIN_ANALYZE"), reason).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(call(HttpMethod.POST, ghost, token("TWIN_ADMIN"), reason).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(call(HttpMethod.POST, ghost, token("TWIN_APPROVER"), reason).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }

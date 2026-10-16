@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soubhagya.systivex.intelligence.ImpactAnalysisService;
+import com.soubhagya.systivex.intelligence.RiskService;
 import com.soubhagya.systivex.intelligence.SimulationService;
 import com.soubhagya.systivex.policy.PolicyService;
+import com.soubhagya.systivex.proposal.api.ProposalResponse;
 import com.soubhagya.systivex.proposal.model.AuditEvent;
 import com.soubhagya.systivex.proposal.model.ProposalRevision;
 import com.soubhagya.systivex.proposal.model.ProposalStatus;
@@ -15,6 +17,7 @@ import com.soubhagya.systivex.proposal.repository.ProposalRevisionRepository;
 import com.soubhagya.systivex.proposal.service.AuditService;
 import com.soubhagya.systivex.proposal.service.ProposalAmendmentService;
 import com.soubhagya.systivex.proposal.service.ProposalAssessmentService;
+import com.soubhagya.systivex.proposal.service.ProposalDecisionService;
 import com.soubhagya.systivex.security.TestJwt;
 import com.soubhagya.systivex.twin.AbstractPostgresIntegrationTest;
 import com.soubhagya.systivex.twin.repository.SystemEntityRepository;
@@ -58,11 +61,15 @@ class ProposalMutationRollbackTest extends AbstractPostgresIntegrationTest {
 
     @Autowired private ImpactAnalysisService impactService;
 
+    @Autowired private RiskService riskService;
+
     @Autowired private SimulationService simulationService;
 
     @Autowired private PolicyService policyService;
 
     @Autowired private PlatformTransactionManager transactions;
+
+    @Autowired private AuditService audits;
 
     @Autowired private JdbcTemplate jdbc;
 
@@ -114,6 +121,36 @@ class ProposalMutationRollbackTest extends AbstractPostgresIntegrationTest {
                     }
                 };
         return new ProposalAmendmentService(revisions, failing, entities, relationships);
+    }
+
+    private ProposalDecisionService failingDecisions() {
+        AuditService failing =
+                new AuditService(events, head, revisions) {
+                    @Override
+                    protected void afterEventStored(AuditEvent stored) {
+                        throw new IllegalStateException("injected audit failure");
+                    }
+                };
+        return new ProposalDecisionService(revisions, failing, entities, relationships,
+                riskService);
+    }
+
+    private ProposalAssessmentService realAssessments() {
+        return new ProposalAssessmentService(
+                revisions, audits, entities, relationships,
+                impactService, simulationService, policyService);
+    }
+
+    private UUID awaitingKey() {
+        UUID key = draftRevision();
+        ProposalAssessmentService assessments = realAssessments();
+        ProposalResponse assessed = new TransactionTemplate(transactions)
+                .execute(status -> assessments.assess(key, ISSUER, "subject"));
+        SubmitRequest submit = new SubmitRequest(assessed.revisionNumber(),
+                assessed.operationsHash(), assessed.assessmentHash());
+        new TransactionTemplate(transactions)
+                .execute(status -> assessments.submit(key, submit, ISSUER, "subject"));
+        return key;
     }
 
     private UUID draftRevision() {
@@ -180,8 +217,7 @@ class ProposalMutationRollbackTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void amendRollbackLeavesSingleDraft() {
-        UUID key = draftRevision();
+    void amendRollbackLeavesSingleDraft() {        UUID key = draftRevision();
         ProposalAmendmentService amendments = failingAmendments();
         CreateProposalRequest amend = new CreateProposalRequest("Amended", null, removeGammaOp());
         assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(
@@ -192,5 +228,48 @@ class ProposalMutationRollbackTest extends AbstractPostgresIntegrationTest {
         assertThat(revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow().getStatus())
                 .isEqualTo(ProposalStatus.DRAFT);
         assertThat(events.count()).isZero();
+    }
+
+    @Test
+    void approveRollbackStaysAwaitingApproval() {
+        UUID key = awaitingKey();
+        ProposalDecisionService decisions = failingDecisions();
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(
+                        status -> decisions.approve(key, "looks good", ISSUER, "approver")))
+                .isInstanceOf(IllegalStateException.class);
+
+        ProposalRevision stored = revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(ProposalStatus.AWAITING_APPROVAL);
+        assertThat(stored.getApproverSubject()).isNull();
+        assertThat(events.count()).isEqualTo(2);
+    }
+
+    @Test
+    void rejectRollbackStaysAwaitingApproval() {
+        UUID key = awaitingKey();
+        ProposalDecisionService decisions = failingDecisions();
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(
+                        status -> decisions.reject(key, "not now", ISSUER, "approver")))
+                .isInstanceOf(IllegalStateException.class);
+
+        ProposalRevision stored = revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(ProposalStatus.AWAITING_APPROVAL);
+        assertThat(stored.getApproverSubject()).isNull();
+        assertThat(events.count()).isEqualTo(2);
+    }
+
+    @Test
+    void expiredMarkingRollbackOnAuditFailure() {
+        UUID key = awaitingKey();
+        jdbc.update("UPDATE proposal_revision SET expires_at = now() - interval '1 hour'"
+                + " WHERE proposal_key = ?", key);
+        ProposalDecisionService decisions = failingDecisions();
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(
+                        status -> decisions.approve(key, "late", ISSUER, "approver")))
+                .isInstanceOf(IllegalStateException.class);
+
+        ProposalRevision stored = revisions.findByProposalKeyAndRevisionNumber(key, 1).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(ProposalStatus.AWAITING_APPROVAL);
+        assertThat(events.count()).isEqualTo(2);
     }
 }

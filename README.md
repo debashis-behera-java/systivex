@@ -153,11 +153,13 @@ consequential actions through explicit control-plane authorization.
   fail-closed `systivex.security.jwt.*` configuration (trusted issuer
   mandatory, no security-off mode, audience/signature/expiry/`nbf`
   always validated) and allowlist-only role mapping (`TWIN_READ`,
-  `TWIN_ANALYZE`, `TWIN_OPERATOR`, `TWIN_ADMIN`; admin inherits the
-  three lesser roles; malformed/unknown claims grant nothing).
-  Twin/impact/risk GETs need `TWIN_READ`, twin POSTs `TWIN_ADMIN`,
-  simulations/policy-evaluations `TWIN_ANALYZE`, sync/observations
-  `TWIN_OPERATOR` behind the still-authoritative loopback guards;
+   `TWIN_ANALYZE`, `TWIN_OPERATOR`, `TWIN_ADMIN`, `TWIN_APPROVER`
+   (Phase 11 S5; admin inherits the
+   three lesser roles, never the approver role; malformed/unknown claims grant nothing).
+   Twin/impact/risk GETs need `TWIN_READ`, twin POSTs `TWIN_ADMIN`,
+   simulations/policy-evaluations `TWIN_ANALYZE`, sync/observations
+   `TWIN_OPERATOR` behind the still-authoritative loopback guards,
+   proposal approve/reject `TWIN_APPROVER`;
   `/actuator/health` stays anonymous (status only),
   `/actuator/prometheus` needs `TWIN_READ`, everything else denied.
   401 on missing/invalid credentials, 403 on insufficient authority,

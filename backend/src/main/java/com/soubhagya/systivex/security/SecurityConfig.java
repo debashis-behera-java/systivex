@@ -40,7 +40,8 @@ public class SecurityConfig {
      * local passwords. The trusted issuer is mandatory; a custom JWK Set URL
      * only overrides key discovery and never disables issuer validation.
      * Role mapping is allowlist-only with TWIN_ADMIN inheriting READ, ANALYZE,
-     * and OPERATOR. Sync/observation loopback guards stay authoritative behind
+     * and OPERATOR — never TWIN_APPROVER, which a trusted issuer must grant
+     * explicitly. Sync/observation loopback guards stay authoritative behind
      * the OPERATOR role. Security errors are fixed safe messages: never tokens,
      * headers, secrets, or JWT claims.
      */
@@ -135,6 +136,8 @@ public class SecurityConfig {
                                                 "/api/v1/twin/proposals/*/withdraw",
                                                 "/api/v1/twin/proposals/*/assess",
                                                 "/api/v1/twin/proposals/*/submit").hasRole("TWIN_ANALYZE")
+                                        .requestMatchers(HttpMethod.POST, "/api/v1/twin/proposals/*/approve",
+                                                "/api/v1/twin/proposals/*/reject").hasRole("TWIN_APPROVER")
                                         .requestMatchers(HttpMethod.PATCH, "/api/v1/twin/proposals/*").hasRole("TWIN_ANALYZE")
                                         .requestMatchers(HttpMethod.GET, "/api/v1/twin/proposals",
                                                 "/api/v1/twin/proposals/**").hasRole("TWIN_READ")
