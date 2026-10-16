@@ -312,6 +312,33 @@ verification partial — see limits below)
   `package -DskipTests` builds; `git diff --check` clean. Every
   changed/new code file under 400 lines.
 
+## Phase 12 S0 — Controlled-execution design D30 (recorded
+2026-10-16; design only, no implementation, no live verification)
+
+- [x] `DECISIONS.md` D30 records binding constraints for any future
+  execution work, verified against the actual code: simulation
+  operations are hypothetical-graph edits with no real-world
+  actuator equivalent (target services expose business APIs
+  only); only twin-record changes may ever be considered first,
+  behind an explicit allowlisted operation-to-actuator map;
+  dedicated explicitly-granted `TWIN_EXECUTOR` (never inherited),
+  executor distinct from proposer and approver on
+  `(issuer, subject)`; human-triggered requests with idempotency
+  keys, no scheduler/autonomy; duplicate/concurrent/retry/partial/
+  uncertain semantics proposed; S5-style revalidation at dispatch
+  with non-overridable `DENY`; break-glass, quorum expansion,
+  shell/SQL/URL dispatch, and LLM-directed actuation excluded;
+  audited execution lifecycle with per-operation evidence
+  (`UNKNOWN`/`UNVERIFIED` where telemetry cannot prove the
+  outcome); assumptions, environmental prerequisites, and
+  rejected alternatives recorded. Proposed D29 terminal-state
+  supersession documented as proposed, not decided.
+- [x] Documentation accuracy: `ARCHITECTURE.md` next-step pointer,
+  `THREAT_MODEL.md` expiry/audit-pending lines, and `README.md`
+  planned-architecture list corrected to S6/S5 reality; S1–S6
+  history untouched. No runtime code, migration, dependency,
+  endpoint, or target-service change in this milestone.
+
 ## What is complete (Phase 10, 2026-10-15 — implementation + automated tests complete)
 
 - [x] OAuth2 resource-server JWT authentication on the control plane (no

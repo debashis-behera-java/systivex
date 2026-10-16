@@ -748,6 +748,132 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   `PROJECT_STATUS.md` Phase 11); expiry handling (S6) pending —
   nothing in S6 may be claimed as built until its slice lands.
 
+## D30. Controlled-execution design (no implementation) — decided (2026-10-16)
+
+- **Decision:** Phase 11 (S1–S6) ends at governed authorization: an
+  `APPROVED` revision is a terminal permission record, and acting on it
+  stays a human step outside the system (D29, unchanged). This decision
+  records the binding constraints any future controlled-execution work
+  must satisfy. It authorizes no code, no endpoints, no migration, no
+  dependencies, and no target-service behavior change — nothing in it
+  may be claimed as built until an implementation slice lands with
+  green tests.
+- **A. What execution means (verified against the actual code):**
+  the simulation operations (`REMOVE_ENTITY`, `ADD_RELATIONSHIP`,
+  `REMOVE_RELATIONSHIP` over UUID/external-ref identifiers, applied to
+  the hypothetical graph only) are reachability-model edits, not
+  actuator commands. The target services expose business APIs only
+  (`POST /api/v1/checkout`, `/api/v1/orders`,
+  `POST /internal/v1/inventory/reserve`,
+  `POST /internal/v1/payments/authorize`) — none creates, deletes, or
+  rewires services, databases, tables, APIs, or
+  `CALLS`/`DEPENDS_ON`/`CONTAINS`/`WRITES`/`EXPOSES` relationships, so
+  no simulation operation has a meaningful or safe real-world actuator
+  equivalent today. The only executable class a first implementation
+  may consider is twin-record changes through the existing twin CRUD
+  semantics (entity/relationship rows, `TWIN_ADMIN`-owned); anything
+  touching target services stays simulation-only until a per-action
+  actuator contract exists. Before any execution code, an explicit
+  operation-to-actuator mapping table is required (operation type →
+  actuator, parameters, idempotency-key source), each entry allowlisted
+  like the Phase 6 telemetry families; unmapped operations refuse,
+  never improvise. Whether twin-record-only mutation constitutes
+  meaningful controlled execution is explicitly unresolved: it changes
+  the model without changing the world, so the implementation slice
+  must justify what outcome telemetry would prove for it — otherwise
+  execution has no meaningful first target and stays simulation-only.
+- **B. Authorization and separation of duties:** a dedicated
+  `TWIN_EXECUTOR` role, explicitly granted by the trusted issuer and
+  never inherited from `TWIN_ADMIN`, `TWIN_APPROVER`, or any other
+  role (same pattern as S5). The executor identity must differ from
+  both the proposer and the approver, comparing `(issuer, subject)`
+  together; holding several roles never exempts an identity from
+  either comparison. Human approval stays independent of execution
+  authority: `TWIN_APPROVER` can never dispatch, `TWIN_EXECUTOR`
+  can never approve. Endpoint paths, default-deny preservation, and
+  fixed error bodies follow the S5 conventions when the
+  implementation slice arrives.
+- **C. Trigger and lifecycle (proposed, not built):** the first
+  implementation must use an explicit human-triggered execution
+  request carrying a caller-supplied idempotency key; no scheduler
+  and no autonomous execution (D29's no-scheduler rule stands).
+  Proposed duplicate/concurrent/retry semantics: identical idempotency
+  keys return the recorded outcome without re-dispatch; concurrent
+  requests serialize on the revision's optimistic lock with exactly
+  one terminal outcome; retries are allowed only from `FAILED` or
+  `UNVERIFIED` after full revalidation, with a bounded attempt count;
+  partial failure marks the revision `FAILED` unless every operation
+  verifies; uncertain outcomes mark `UNVERIFIED`, never success. A
+  previously approved proposal whose fingerprint, risk, policy, or
+  evidence changed since approval must be refused and re-approved —
+  never silently reassessed and executed in one step. If implementing
+  this requires `APPROVED` to gain an outgoing transition, that
+  changes D29's terminal-state list and must be recorded as an
+  explicit supersession with rationale — it is proposed here, not
+  decided.
+- **D. Policy and safety gate:** immediately before any dispatch, the
+  implementation must revalidate approval status, hash integrity,
+  policy (recomputed server-side; `DENY` remains non-overridable),
+  structural fingerprint, risk/evidence freshness, and TTL — the S5
+  recheck, repeated at dispatch time, not cached from approval.
+  Explicitly excluded: break-glass, quorum expansion, unrestricted
+  shell/SQL, arbitrary URL dispatch, and LLM-directed actuator
+  access (see `THREAT_MODEL.md` T1/T4 and §4). Least-privilege
+  target-service authentication (per-action, short-lived
+  credentials, never logged or embedded in audit bodies),
+  short timeouts, idempotency keys, blast-radius limits (single
+  revision scope, no fan-out beyond the assessed impact), and
+  fail-closed containment are requirements on the future
+  implementation, not claims about today.
+- **E. Audit and outcome proof:** execution needs its own audited
+  lifecycle (proposed: request, authorization, dispatch, result,
+  failure, verification — exact action set to be fixed by the
+  implementation slice), each event carrying actor, key/revision,
+  hashes, and reason in the existing chain model, committed
+  atomically with its state change; retries append new events and
+  never rewrite history. Schema changes, if any, arrive through a
+  future Flyway migration under the existing validate-only regime —
+  no migration is created here. The evidence contract is per
+  operation: intended change linked to observable outcome. Current
+  telemetry (health plus six aggregate lifetime counter families
+  with `observedAt` freshness) may serve only where it genuinely
+  fits; aggregate counters cannot prove a graph edit, and any case
+  without an operation-specific verifier must return `UNKNOWN` or
+  `UNVERIFIED`, never success. Local state and its audit event share
+  one database transaction, but external dispatch is never part of it:
+  the design requires persisting a durable execution intent first,
+  dispatching, then appending result and verification events keyed by
+  the idempotency key. A crash between intent and result reconciles
+  through re-observation (bounded retries, then `UNVERIFIED`);
+  timeouts and missing verification are `UNVERIFIED`, never success.
+  A transactional outbox may be considered by the implementation slice
+  only if the dispatch channel justifies it — it is not mandated here.
+  The chain stays tamper-evident
+  (verify-to-detect, never repair, never tamper-proof).
+- **Assumptions:** one trusted issuer; human operators behind every
+  trigger; local-machine boundary until the deferred authentication
+  story lands (`ARCHITECTURE.md` end). Unresolved environmental
+  prerequisites (not code): a configured trusted issuer, a
+  target-service authentication design, secret management, the
+  per-action actuator contracts, and operation-specific telemetry
+  verifiers.
+- **Rejected alternatives:** autonomous/scheduled execution
+  (violates human-trigger and D29); generic shell/SQL/URL dispatch
+  (violates least privilege and T4); LLM-directed actuation
+  (violates T1/T4); reusing `TWIN_ADMIN`/`TWIN_APPROVER` for
+  dispatch (violates least privilege and approval independence);
+  break-glass and `DENY` override (violate D29 and the anti-goals);
+  approver quorum above one (out of scope).
+- **Rationale:** preserves the governing principle with the last two
+  clauses still human-gated — the model proposes, the system
+  verifies, policy authorizes, and only an explicitly authorized
+  human-triggered tool executes, with telemetry proving the outcome.
+  Recording the constraints before any code keeps execution from
+  arriving as an unreviewed side effect of a "natural next step".
+- **State:** Designed and recorded (see `PROJECT_STATUS.md`
+  Phase 12 S0). Implementation pending — nothing in this decision
+  may be claimed as built until its slice lands with green tests.
+
 ## Supersession rule
 
 New decisions amend this file with date and rationale; they never silently edit

@@ -416,7 +416,9 @@ Intentionally absent (not bugs — deferred by decision):
 - Target-service cross-database atomicity (rejected in D17; reconciliation is
   future work, not missing plumbing).
 
-Next architectural step (see `PROJECT_STATUS.md`): approval workflow and
-controlled execution behind the policy gate — still without agents, and
-never exposed beyond the local machine before the deferred
-authentication story lands.
+Next architectural step (see `PROJECT_STATUS.md`): controlled
+execution behind the policy gate, constrained by the recorded
+`DECISIONS.md` D30 design (explicit `TWIN_EXECUTOR`, human trigger,
+revalidation at dispatch, audited outcome proof) — still without
+agents, no implementation yet, and never exposed beyond the local
+machine before the deferred authentication story lands.

@@ -173,11 +173,13 @@ consequential actions through explicit control-plane authorization.
 - Twin trace/log presence signals (health/counter annotation is Phase 6),
   Git integration
 - Agent orchestration, tooling, evidence model
-- Approval workflows and controlled execution
-  (impact paths are Phase 5, risk classification Phase 7, hypothetical
-  simulation Phase 8, advisory policy evaluation Phase 9 — all
-  read-only and advisory; governed proposals + audit designed in
-  `DECISIONS.md` D29, not yet implemented), verification
+- Approval workflows (implemented Phase 11 S5) and controlled
+  execution (constrained by the `DECISIONS.md` D30 design, not
+  implemented; impact paths are Phase 5, risk classification
+  Phase 7, hypothetical simulation Phase 8, advisory policy
+  evaluation Phase 9 — all read-only and advisory; governed
+  proposals + audit + expiry implemented in Phase 11 S1–S6),
+  verification
 - Cross-database checkout atomicity/reconciliation, cache (Redis), Spring AI / Ollama, frontend
 - Trace exploration UI (Tempo), unified trace/log UI, anomaly detection,
   any agent or automated use of telemetry (Loki log exploration is done;
