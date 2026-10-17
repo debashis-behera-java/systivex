@@ -1,6 +1,8 @@
 # Systivex Architecture
 
-Status: **target architecture (planned) + current implementation status (verified 2026-09-28)**.
+Status: **target architecture (planned) + current implementation status**
+(documentation reviewed 2026-10-17; last runtime test verification
+2026-10-16, Phase 11 S6).
 Nothing below beyond "Current implementation" should be read as implemented.
 
 ## 1. High-level target architecture
@@ -52,26 +54,43 @@ The control plane is a single Spring Boot deployment with strict module boundari
 The `twin` module exists in outline (`model`, `repository`, `service`, `api`
 packages) plus the Phase 4 `observation` package (scanner + sync, repository
 connector only), the Phase 5 `intelligence` package (read-only impact
-analysis only), the Phase 6 `telemetry` package (pull-based runtime
+analysis, plus Phase 7 risk classification and Phase 8 hypothetical
+simulation), the Phase 6 `telemetry` package (pull-based runtime
 annotation only), the Phase 9 `policy` package (advisory evaluation only),
-and the Phase 10 `security` package (JWT resource server, role policy,
-fail-closed configuration); the remaining target modules are **not yet created** — no placeholder
-packages exist for them by decision:
+the Phase 10 `security` package (JWT resource server, role policy,
+fail-closed configuration), and the Phase 11 `proposal` package (governed
+proposals, approvals, and tamper-evident audit); the remaining target
+modules (`execution`, `verification`) are **not yet created** — no
+placeholder packages exist for them by decision:
 
 - `twin` — System Twin model and connectors (**model + persistence + minimal
   CRUD API exist**; repository connector exists since Phase 4, health/counter
   runtime annotation exists since Phase 6, trace/log presence still planned)
-- `intelligence` — change impact and risk (**deterministic read-only impact traversal
-  exists since Phase 5**: `GET /api/v1/twin/impact`; **ordinal risk
-  classification exists since Phase 7**: `GET /api/v1/twin/risk` over impact
-  paths plus runtime metadata; simulation still planned)
-- `policy` — policy evaluation and approval workflow (**advisory evaluation
-  exists since Phase 9**; governed proposals + audit designed in Phase 11,
-  see `DECISIONS.md` D29 — not yet implemented)
+- `intelligence` — change impact, change risk, and hypothetical simulation
+  (**deterministic read-only impact traversal exists since Phase 5**:
+  `GET /api/v1/twin/impact`; **ordinal risk classification exists since
+  Phase 7**: `GET /api/v1/twin/risk` over impact paths plus runtime
+  metadata; **hypothetical change simulation exists since Phase 8**:
+  `POST /api/v1/twin/simulations` replays impact + risk over an in-memory
+  hypothetical graph and returns `simulated: true` — it is advisory and
+  never executes a real change; the separate `policy` package consumes this
+  simulation for Phase 9 advisory evaluation)
+- `policy` — policy evaluation (**advisory evaluation exists since
+  Phase 9**; the governed proposal and approval workflow is implemented in
+  the separate `proposal` package since Phase 11 — see `DECISIONS.md` D29)
 - `proposal` — governed change proposals and tamper-evident audit
-  (designed, not yet created — no placeholder package exists for it by
-  decision; see `DECISIONS.md` D29)
-- `execution` — controlled, auditable action dispatch (planned)
+  (**implemented since Phase 11 S1–S6**: immutable revision persistence with
+  a `DRAFT`→`ASSESSED`→`AWAITING_APPROVAL`→`APPROVED`/`REJECTED` lifecycle
+  (plus `WITHDRAWN`/`EXPIRED`/`SUPERSEDED`), draft/assess/submit/amend/
+  withdraw and read APIs, `TWIN_APPROVER` approval/rejection with separation
+  of duties and freshness re-checks, a hash-chained append-only audit with
+  `GET /api/v1/twin/audit/verify`, and lazy expiry (7-day assessment TTL,
+  30-day hard maximum; no scheduler). `APPROVED` is a terminal permission
+  record and executes nothing — see `DECISIONS.md` D29)
+- `execution` — controlled, auditable action dispatch (**design only, not
+  implemented**: constrained by `DECISIONS.md` D30 and gated by the D31
+  feasibility gate; no current simulation operation has a qualifying,
+  independently verifiable target actuator)
 - `verification` — post-change checks against twin + runtime (planned)
 - `observation` — code/arch/runtime ingest (**repository connector exists
   since Phase 4**: read-only scan of `backend/target-services/` + explicit
@@ -278,8 +297,14 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
   observation (`POST /api/v1/twin/observations`: `{}` default, loopback
   only with 403 off loopback, health + six allowlisted counters into the
   namespaced `runtime` metadata key, bounded receipt, 400/404/409
-  fail-closed with full rollback);
-  proposals/approvals/records are still planned.
+  fail-closed with full rollback).
+  Governed proposals are implemented since Phase 11 S1–S6
+  (`POST /api/v1/twin/proposals` with `.../{key}/withdraw|assess|submit|
+  approve|reject`, `PATCH .../{key}`, and list/latest/revisions/audit reads)
+  plus hash-chained audit verification (`GET /api/v1/twin/audit/verify`);
+  none of this dispatches a target change — `APPROVED` is a terminal
+  permission record, and controlled-execution *records* remain unimplemented
+  design (D30/D31).
   Change-risk assessment (`GET /api/v1/twin/risk`: same `from`/`maxDepth`/
   `includeTypes` conventions as impact; ordinal `LOW`/`MEDIUM`/`HIGH`/
   `UNKNOWN` levels with sorted reasons and `uncertain`/`stale` flags over
@@ -298,7 +323,7 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
 - **SSE** for streaming long-running analysis/simulation progress (planned).
 - No WebSockets at this stage (see `DECISIONS.md`).
 
-## 8. Current implementation status (verified 2026-09-30)
+## 8. Current implementation status (documentation reviewed 2026-10-17; last runtime test verification 2026-10-16, Phase 11 S6)
 
 Implemented:
 
@@ -390,6 +415,27 @@ Implemented:
   `TWIN_READ`-restricted Prometheus metrics, deny-by-default otherwise
   (see `DECISIONS.md` D28). Automated JWT tests use local test keys
   only — live IdP verification pending a configured trusted issuer.
+- Governed change proposals (Phase 11 S1–S6, see §3 and `DECISIONS.md`
+  D29): Flyway `V2__proposal_governance.sql` adds immutable
+  revision-numbered `proposal_revision`, `audit_event`, and the singleton
+  `audit_chain_head`; the `proposal` package appends a tamper-evident
+  SHA-256 hash chain (`audit-event-v1`) transactionally under the head-row
+  lock and verifies it read-only via `GET /api/v1/twin/audit/verify`;
+  draft, assessment, submission, amendment, withdrawal, and read APIs are
+  served with `TWIN_APPROVER` approval/rejection, `(issuer, subject)`
+  separation of duties, freshness re-checks, and lazy expiry
+  (`min(expires_at, createdAt + 30 days)`, 7-day assessment TTL, no
+  scheduler). An `APPROVED` record is a terminal authorization artifact and
+  executes nothing. Verified in tests (full `./mvnw clean test` suite: 398
+  tests, 0 failures; see `PROJECT_STATUS.md` Phase 11 S1–S6). No new
+  dependencies, no target-service change.
+
+Phase 12 S0–S1 (2026-10-16/17) is **design and feasibility work only, not
+runtime implementation**: `DECISIONS.md` D30 records the controlled-execution
+constraints and D31 records the feasibility gate, but no execution endpoint,
+migration, `TWIN_EXECUTOR` role wiring, or actuator exists, no simulation
+operation has a qualifying target actuator, and `APPROVED` stays terminal
+(D29 preserved, not superseded).
 
 Why PostgreSQL + Flyway + a relational graph at this stage: the records the
 control plane will eventually authorize against (twin state, proposals,
@@ -400,13 +446,14 @@ consumer yet (see `DECISIONS.md` D10).
 
 Intentionally absent (not bugs — deferred by decision):
 
-- Twin trace/log presence signals, approval workflow, controlled
-  execution, verification modules (the repository connector is Phase 4,
-  above; read-only impact traversal is Phase 5, above; health/counter
-  annotation is Phase 6, above; ordinal risk classification is Phase 7,
-  above; hypothetical change simulation is Phase 8, above; advisory
-  policy evaluation is Phase 9, above; control-plane authentication is
-  Phase 10, above).
+- Twin trace/log presence signals, real-world controlled execution,
+  target-service dispatch, and execution/change verification modules
+  (the repository connector is Phase 4, above; read-only impact traversal
+  is Phase 5, above; health/counter annotation is Phase 6, above; ordinal
+  risk classification is Phase 7, above; hypothetical change simulation is
+  Phase 8, above; advisory policy evaluation is Phase 9, above;
+  control-plane authentication is Phase 10, above; governed proposals,
+  approvals, and the tamper-evident audit are Phase 11, above).
 - Redis, Spring AI / Ollama, frontend (control-plane security is done;
   target-service authentication is still deferred).
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
