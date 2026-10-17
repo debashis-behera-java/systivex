@@ -1,28 +1,31 @@
 # Systivex Project Status
 
-Last verified: **2026-10-15** (Asia/Kolkata). This document must be updated
+Last verified: **2026-10-17** (Asia/Kolkata). This document must be updated
 whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 10 — Control-plane authentication & authorization (implemented
-2026-10-15; automated tests green; live IdP verification pending — no
-trusted issuer configured).** Phases 0–9 below are kept as history.
+**Phase 12 — Controlled execution (design/feasibility only).** D30 records
+the binding controlled-execution constraints (Phase 12 S0, 2026-10-16);
+D31 records the execution feasibility gate (Phase 12 S1, 2026-10-17).
+Systivex remains simulation/approval-only and `APPROVED` stays terminal
+(D29 preserved, not superseded). No execution endpoint, migration,
+executor-role wiring, or actuator exists. Phases 0–11 below are kept as
+history.
 
-## Next phase (designed, not implemented)
+## Next phase (gated, not scheduled)
 
-**Phase 11 — Governed change proposals and tamper-evident audit
-(design agreed 2026-10-15 in `DECISIONS.md` D29; no code, migration,
-or endpoint built).** Eight governance decisions recorded
-(distinct `TWIN_APPROVER` without admin inheritance, DENY never
-approvable, stale-assessment rejection, 7-day/30-day lazy TTL,
-mandatory reasons, `TWIN_READ` audit visibility with no deletion or
-repair, `(issuer, subject)` separation of duties, fully transactional
-state changes with no execution). Revision model (immutable revision
-rows, JPA version kept concurrency-only) and snapshot-consistency
-strategy (content-hash fingerprint excluding runtime evidence, separate
-risk-freshness recheck) resolved in D29. Implementation pending — none
-of it may be claimed as done until its slices land with green tests.
+**Execution implementation — gated by the D31 feasibility gate.** No
+current simulation operation qualifies: each is a hypothetical-graph edit
+with no independently verifiable target actuator (verified against code in
+D31). Execution proceeds only when a specific typed operation, a real
+allowlisted actuator contract with documented authentication/least
+privilege, an operation-specific independent verifier, safe
+duplicate/crash/timeout/partial recovery, D30-compliant identity separation
+and dispatch-time revalidation, a durable intent/result/audit design, and
+an explicit D29-change decision are all satisfied and approved. Until then
+execution remains unimplemented — stated plainly, not filled with
+scaffolding.
 
 ## Phase 11 S1 — Governance persistence foundation (implemented
 2026-10-15; migration + persistence tests green)
@@ -338,6 +341,51 @@ verification partial — see limits below)
   planned-architecture list corrected to S6/S5 reality; S1–S6
   history untouched. No runtime code, migration, dependency,
   endpoint, or target-service change in this milestone.
+
+## Phase 12 S1 — Execution feasibility gate (recorded 2026-10-17;
+documentation/design only, no implementation, no live verification)
+
+- [x] `DECISIONS.md` D31 records the Phase 12 S1 outcome: Systivex stays
+  simulation/approval-only; D29 (`APPROVED` terminal) is preserved and
+  **not** superseded; `REMOVE_ENTITY` / `ADD_RELATIONSHIP` /
+  `REMOVE_RELATIONSHIP` remain unmapped and refused for external
+  execution; no execution endpoint, migration, executor-role wiring,
+  actuator, or target-service change was added. Verified against the
+  actual code: every simulation operation is a hypothetical-graph edit,
+  twin CRUD is create/get/list only (no delete, no update), `ADD_RELATIONSHIP`
+  has an existing twin write path but it changes Systivex's own model
+  only, and the four target services expose business POSTs plus a
+  read-only Actuator `health,prometheus` surface. The operation-to-actuator
+  mapping is recorded as a **design table only** — no runtime allowlist
+  and no speculative refusal scaffolding were added.
+- [x] Corrected retry/recovery contract recorded (replaces D30 §C retry
+  wording): an authoritative rejection (evidence no effect occurred), a
+  confirmed partial effect, and an uncertain outcome (timeout after
+  dispatch, crash before the result is recorded) are distinguished; an
+  operation whose prior effect is uncertain is never automatically
+  redispatched; retry is permitted only when no prior effect is
+  authoritatively established or a documented downstream idempotency
+  contract safely deduplicates the same logical operation; a bounded
+  retry count is not a safety guarantee; partial effects require a
+  separately approved recovery/compensation contract; unresolved outcomes
+  stay `UNVERIFIED` pending reconciliation; local transaction/audit
+  atomicity is kept explicitly separate from external side effects.
+- [x] The seven-point feasibility gate in D31 records what any future
+  execution work must satisfy (typed operation + allowlisted actuator;
+  real actuator contract with documented authentication and least
+  privilege; operation-specific independent verifier; safe duplicate/
+  crash/timeout/partial recovery; D30 identity separation, human
+  trigger, dispatch-time policy/fingerprint/risk/expiry revalidation with
+  non-overridable `DENY`; durable intent/result/audit that never claims
+  external atomicity or treats missing evidence as success; explicit
+  D29-change approval).
+- [x] Documentation only: `DECISIONS.md` D31 added (D30 §C correction
+  noted), `ARCHITECTURE.md` next-step pointer and `THREAT_MODEL.md`
+  execution-pending lines corrected to S1 reality; S0 and S1–S6 history
+  untouched. No runtime code, migration, dependency, endpoint, or
+  target-service change. No operation satisfies the gate, so execution
+  remains unimplemented — stated plainly rather than filled with
+  scaffolding.
 
 ## What is complete (Phase 10, 2026-10-15 — implementation + automated tests complete)
 

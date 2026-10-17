@@ -417,8 +417,14 @@ Intentionally absent (not bugs — deferred by decision):
   future work, not missing plumbing).
 
 Next architectural step (see `PROJECT_STATUS.md`): controlled
-execution behind the policy gate, constrained by the recorded
-`DECISIONS.md` D30 design (explicit `TWIN_EXECUTOR`, human trigger,
-revalidation at dispatch, audited outcome proof) — still without
-agents, no implementation yet, and never exposed beyond the local
-machine before the deferred authentication story lands.
+execution remains **unimplemented and gated**. `DECISIONS.md` D30
+records the binding constraints (explicit `TWIN_EXECUTOR`, human
+trigger, revalidation at dispatch, audited outcome proof) and D31
+records the Phase 12 S1 feasibility gate — no current simulation
+operation has a meaningful, independently verifiable target actuator
+(all three are hypothetical-graph edits; the target services expose
+business POSTs and a read-only Actuator surface only). `APPROVED`
+stays terminal (D29) until a specific operation and actuator satisfy
+the gate and a D29 change is explicitly decided. Still without agents,
+no implementation yet, and never exposed beyond the local machine
+before the deferred authentication story lands.

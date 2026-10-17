@@ -267,6 +267,22 @@ itself a place data can leak. The following holds for the current pipeline
   issuer. The four target-service APIs remain open local-only endpoints
   (unchanged by this phase) and must still not be exposed beyond the
   machine.
+- **Phase 12 S1 execution feasibility gate (2026-10-17): no execution
+  exists and none is authorized.** `DECISIONS.md` D31 preserves D29
+  (`APPROVED` terminal) and leaves all simulation operations unmapped and
+  refused for external execution; no endpoint, migration, executor-role,
+  or actuator was added. A future implementation must first satisfy the
+  documented gate: a specific typed operation with an allowlisted
+  actuator, a real actuator contract with documented authentication and
+  least privilege, an operation-specific independent verifier, safe
+  duplicate/crash/timeout/partial-effect recovery, D30 identity
+  separation and dispatch-time revalidation with non-overridable `DENY`,
+  a durable intent/result/audit design that never claims external
+  atomicity or treats missing evidence as success, and an explicit
+  decision before any change to D29. An operation whose prior effect is
+  uncertain is never automatically redispatched; partial effects require
+  a separately approved recovery/compensation contract; unresolved
+  outcomes stay `UNVERIFIED` (T4/T5/T7).
 
 ## 3. Out-of-scope today, in-scope for design
 
@@ -284,7 +300,9 @@ itself a place data can leak. The following holds for the current pipeline
   Phase 11 S5, submit-path expiry in S6; controlled execution
   constrained by the `DECISIONS.md` D30 design, not implemented);
   risk-classification taxonomy.
-- Execution sandboxing, blast-radius limits, rollback/verification loops.
+- Execution sandboxing, blast-radius limits, rollback/verification loops
+  (gate recorded in `DECISIONS.md` D31; execution unimplemented, no
+  operation qualifies today).
 - Persistence hardening and audit-log immutability (twin tables exist
   now; the audit chain is implemented since Phase 11 S2 as
   tamper-evident — hash-chained with a verify endpoint — explicitly not

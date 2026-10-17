@@ -3,7 +3,9 @@
 Record of binding decisions taken at project foundation (2026-09-28) and
 extended in Phase 1 and Phase 2A (2026-09-29), Phase 2B and Phase 3A (2026-09-30),
 Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), Phase 5 (2026-10-10),
-and Phase 6 (2026-10-13), and Phase 7 (2026-10-14).
+Phase 6 (2026-10-13), Phase 7 (2026-10-14), Phases 8/9 (2026-10-15),
+Phase 10 (2026-10-15), Phase 11 (2026-10-15/16), and Phase 12 S0/S1
+(2026-10-16/17).
 Status labels: **decided** (binding now) / **planned** (intent, not yet implemented).
 
 ## D1. Java 21 — decided
@@ -873,6 +875,107 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
 - **State:** Designed and recorded (see `PROJECT_STATUS.md`
   Phase 12 S0). Implementation pending — nothing in this decision
   may be claimed as built until its slice lands with green tests.
+  The retry/recovery wording in §C is corrected by D31 (2026-10-17),
+  which replaces the bounded-retry-after-revalidation proposal with an
+  explicit uncertain-outcome rule; every other §C constraint stands.
+
+## D31. Phase 12 S1 — Execution feasibility gate (documentation/design only) — decided (2026-10-17)
+
+- **Decision:** Phase 12 S1 is a documentation/design milestone, not an
+  implementation. Systivex remains **simulation/approval-only**: D29 is
+  preserved unchanged and `APPROVED` remains the terminal permission
+  record. The three simulation operations (`REMOVE_ENTITY`,
+  `ADD_RELATIONSHIP`, `REMOVE_RELATIONSHIP`) stay unmapped and refused
+  for external execution. This milestone adds no execution endpoint, no
+  migration, no `TWIN_EXECUTOR` role wiring, no actuator, and no
+  target-service behaviour change, and it does **not** supersede D29.
+  Any future change to the terminal `APPROVED` state requires its own
+  explicit, dated decision first.
+- **Why no current operation qualifies (verified against the actual
+  code):** every simulation operation is a hypothetical-graph edit
+  (`intelligence/SimulationOperation.java`) applied to in-memory working
+  copies only. `REMOVE_ENTITY` and `REMOVE_RELATIONSHIP` have no
+  actuator at all — twin CRUD is create/get/list only, with no delete and
+  no update (`twin/api/TwinController.java`). `ADD_RELATIONSHIP` has a
+  write path (`POST /api/v1/twin/relationships`) but it changes
+  Systivex's own model, not the target environment, and its only
+  "outcome" is a self-referential row read — it cannot demonstrate a
+  world change. The four target services expose business POSTs
+  (checkout / orders / reserve / authorize) plus a read-only Actuator
+  `health,prometheus` surface; none creates, deletes, or rewires
+  services, databases, tables, APIs, or graph edges. No operation
+  therefore maps to a meaningful, independently verifiable
+  target-environment change.
+- **Operation-to-actuator mapping (design table only — no runtime
+  allowlist exists and none was added):**
+
+  | Simulation operation | Candidate actuator | Real-world effect | Verdict |
+  |---|---|---|---|
+  | `REMOVE_ENTITY` | none | none (model only) | refused |
+  | `ADD_RELATIONSHIP` | `POST /api/v1/twin/relationships` (existing) | none (model only) | refused for execution; twin-model write only |
+  | `REMOVE_RELATIONSHIP` | none | none (model only) | refused |
+
+  The table is recorded in documentation because no real, approved
+  actuator was identified. An actuator is never invented to make the
+  milestone produce runtime code.
+- **Feasibility gate (required before any execution implementation is
+  approved):**
+
+  1. a specific, meaningful operation with an explicit typed request and
+     an allowlisted actuator;
+  2. a real target API or actuator contract with documented
+     authentication and least privilege;
+  3. an operation-specific, independent verifier that can prove the
+     intended postcondition;
+  4. safe duplicate handling and crash/timeout/partial-effect recovery;
+  5. D30-compliant identity separation (`TWIN_EXECUTOR` distinct from
+     proposer and approver), human-triggered authorization, dispatch-time
+     policy/fingerprint/risk/expiry revalidation, and a non-overridable
+     `DENY`;
+  6. a durable intent/result/audit design that never claims external
+     atomicity and never treats missing evidence as success;
+  7. an explicit decision approving any necessary change to D29.
+
+  If no operation satisfies the gate, execution remains unimplemented —
+  stated plainly rather than filled with speculative scaffolding (no
+  unused `OperationToActuator` refusals, no consumerless execution state
+  machine).
+- **Corrected retry/recovery contract (binding on any future
+  implementation; replaces the retry wording proposed in D30 §C):**
+  outcomes are explicitly distinguished as (a) an **authoritative
+  rejection** with evidence that no effect occurred; (b) a **confirmed
+  partial effect**; and (c) an **uncertain outcome** (e.g. a timeout
+  after dispatch, or a crash before the result is recorded). An
+  operation whose prior effect is uncertain is **never automatically
+  redispatched**. A retry is permitted only when no prior effect is
+  authoritatively established, or when a documented downstream
+  idempotency contract safely deduplicates the same logical operation; a
+  bounded retry count alone is not a safety guarantee. Partial effects
+  require a separately approved recovery or compensation contract —
+  retrying or compensating is never assumed safe. If the outcome cannot
+  be resolved it stays `UNVERIFIED` and requires reconciliation. Local
+  transaction/audit atomicity (the state change and its audit event
+  share one database transaction) is kept explicitly separate from
+  external side effects (dispatch is never part of that transaction).
+- **Decisions still requiring approval:** whether to pursue any execution
+  work at all by identifying a qualifying operation; the concrete
+  operation-to-actuator mapping once such an actuator exists; the
+  actuator's authentication and least-privilege design; the
+  recovery/compensation contract for partial effects; any schema change
+  for durable intent/result/verification records; and any supersession
+  of D29's terminal-state list.
+- **Rejected alternatives:** implementing a model-only twin mutation and
+  labelling it execution (it changes the model, not the world — D30
+  leaves this unresolved and this decision resolves it as
+  not-execution); speculative `OperationToActuator`/state-machine
+  scaffolding with no consumer; inventing a target actuator to justify
+  runtime code; superseding D29 without a separate decision; and
+  carrying D30's bounded-retry-after-revalidation wording forward
+  unchanged (unsafe for uncertain outcomes).
+- **State:** Recorded and decided (documentation/design only; no code,
+  migration, dependency, endpoint, role, or target-service change). See
+  `PROJECT_STATUS.md` Phase 12 S1. Execution remains unimplemented —
+  nothing in this decision may be claimed as built.
 
 ## Supersession rule
 
