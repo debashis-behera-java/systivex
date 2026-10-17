@@ -27,6 +27,31 @@ an explicit D29-change decision are all satisfied and approved. Until then
 execution remains unimplemented — stated plainly, not filled with
 scaffolding.
 
+## Phase 13 S0 — Open-source contributor readiness (recorded 2026-10-17;
+licensing + contributor docs + CI only, no application change)
+
+- [x] Added root `LICENSE` (unmodified Apache License 2.0; copyright 2026
+  Soubhagya Kumar Behera) and rewrote `README.md` so it separates
+  implemented-and-tested functionality, design/feasibility-only work, and
+  planned work, states plainly that controlled execution is not implemented
+  and remains gated, and links the license and contributor documents.
+- [x] Added `CONTRIBUTING.md` (architecture pointers, prerequisites, verified
+  build/test commands, review expectations, secret-handling rules, and bounded
+  good-first contributions), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
+  `SECURITY.md` (private vulnerability reporting), and GitHub issue/PR
+  templates under `.github/`.
+- [x] Added `.github/workflows/backend-ci.yml`: on pull requests and pushes to
+  `main`, JDK 21 plus the repository Maven wrapper run `./mvnw -B clean test`
+  in `backend/` (Testcontainers PostgreSQL via the runner's Docker daemon),
+  with read-only permissions, a timeout, and Maven dependency caching. No
+  frontend job exists because no frontend exists.
+- [x] `DECISIONS.md` D32 records the Apache-2.0 licensing choice and the
+  boundaries of the contributor-readiness work.
+- [x] No business logic, schema, authentication/authorization, policy, tests,
+  dependencies, or infrastructure changed, and no frontend was started.
+  Controlled execution remains unimplemented and gated (D30/D31 unchanged;
+  `APPROVED` stays terminal per D29).
+
 ## Phase 11 S1 — Governance persistence foundation (implemented
 2026-10-15; migration + persistence tests green)
 

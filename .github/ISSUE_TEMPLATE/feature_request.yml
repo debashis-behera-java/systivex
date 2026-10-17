@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose a feature or enhancement for Systivex
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement. For anything that changes execution,
+        authentication, security-sensitive behavior, or infrastructure, please keep in
+        mind that such changes must respect the recorded decisions in
+        [DECISIONS.md](https://github.com/soubhagya-behera/systivex/blob/main/DECISIONS.md).
+
+        Please do not include secrets, credentials, tokens, or real data below.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve, and who is affected? Describe the need, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: How you would approach it, and which parts of the repository it touches.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you considered and why you prefer this one.
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and boundaries
+      description: What is explicitly in scope, and what is out of scope. Note any new dependency, migration, or API surface.
+      placeholder: |
+        In scope:
+        Out of scope:
+        New dependencies / migrations / endpoints:
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have searched existing issues for a similar proposal.
+          required: true
+        - label: This proposal does not bypass existing recorded decisions (or I have explained why a decision change is needed).
+          required: true

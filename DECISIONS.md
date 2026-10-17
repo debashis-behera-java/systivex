@@ -4,8 +4,8 @@ Record of binding decisions taken at project foundation (2026-09-28) and
 extended in Phase 1 and Phase 2A (2026-09-29), Phase 2B and Phase 3A (2026-09-30),
 Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), Phase 5 (2026-10-10),
 Phase 6 (2026-10-13), Phase 7 (2026-10-14), Phases 8/9 (2026-10-15),
-Phase 10 (2026-10-15), Phase 11 (2026-10-15/16), and Phase 12 S0/S1
-(2026-10-16/17).
+Phase 10 (2026-10-15), Phase 11 (2026-10-15/16), Phase 12 S0/S1
+(2026-10-16/17), and Phase 13 S0 (2026-10-17).
 Status labels: **decided** (binding now) / **planned** (intent, not yet implemented).
 
 ## D1. Java 21 — decided
@@ -976,6 +976,37 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   migration, dependency, endpoint, role, or target-service change). See
   `PROJECT_STATUS.md` Phase 12 S1. Execution remains unimplemented —
   nothing in this decision may be claimed as built.
+
+## D32. Apache-2.0 licensing and open-source contributor readiness — decided (2026-10-17)
+
+- **Decision:** Systivex is released under the **Apache License, Version 2.0** (root
+  `LICENSE`, unmodified standard text; copyright notice 2026 Soubhagya Kumar Behera).
+  Phase 13 S0 adds the contributor-facing material needed for external participation:
+  `README.md` accuracy/navigation cleanup, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
+  (Contributor Covenant 2.1), `SECURITY.md`, GitHub issue/PR templates under `.github/`,
+  and a backend GitHub Actions workflow that runs the existing verification command.
+- **Rationale:** Apache-2.0 is permissive, well understood, and includes an explicit
+  patent grant — appropriate for a platform intended to be read, run, and extended by
+  others. Contributor readiness is documentation and automation only: it lowers the cost
+  of a first contribution without changing what the system does.
+- **CI scope:** the workflow (`.github/workflows/backend-ci.yml`) runs on pull requests and
+  pushes to `main`, uses the repository's Maven wrapper on Java 21, and executes
+  `./mvnw -B clean test` in `backend/` — the same suite used locally (Testcontainers
+  PostgreSQL via the runner's Docker daemon). It grants only `contents: read`, sets a
+  timeout, and caches Maven dependencies. No frontend job exists because no frontend
+  exists.
+- **Boundaries:** no business logic, database schema, authentication behavior,
+  authorization rules, policy enforcement, or security controls are changed; no
+  application dependencies or infrastructure are added for contributor readiness; no
+  existing test is modified to pass; the frontend is **not** started. D29–D31 are
+  unchanged: controlled execution remains unimplemented and gated, `APPROVED` stays
+  terminal, and no actuator or executor role is introduced.
+- **Licensing note:** dependencies retain their own licenses (managed transitively via
+  Spring Boot); the repository contains no vendored or separately licensed third-party
+  source beyond the standard Apache-licensed Maven wrapper. This record is a licensing
+  choice, not legal advice.
+- **State:** Recorded and decided (documentation, community files, and CI only). See
+  `PROJECT_STATUS.md` Phase 13 S0. Nothing here is runtime behavior.
 
 ## Supersession rule
 

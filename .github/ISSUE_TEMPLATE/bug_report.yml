@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible problem in Systivex
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report.
+
+        **Do not report security vulnerabilities here.** Please follow
+        [SECURITY.md](https://github.com/soubhagya-behera/systivex/blob/main/SECURITY.md)
+        and use private reporting instead.
+
+        Please remove any secrets, tokens, credentials, real data, or sensitive logs from
+        everything you paste below.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps needed to reproduce the problem.
+      placeholder: |
+        1. Start the control plane with ...
+        2. Call `POST /api/v1/twin/...` with ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened, including the error message or status code.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (sanitized)
+      description: Relevant, non-sensitive environment details.
+      placeholder: |
+        - Commit / version:
+        - OS:
+        - JDK (java -version):
+        - Docker available? (yes/no):
+        - PostgreSQL version (if running the app):
+      value: |
+        - Commit / version:
+        - OS:
+        - JDK (java -version):
+        - Docker available? (yes/no):
+        - PostgreSQL version (if running the app):
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output (optional, sanitized)
+      description: Relevant, sanitized output. Do not paste tokens, secrets, or request bodies.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have searched existing issues for a duplicate.
+          required: true
+        - label: I have removed all secrets, credentials, tokens, and sensitive data from this report.
+          required: true
