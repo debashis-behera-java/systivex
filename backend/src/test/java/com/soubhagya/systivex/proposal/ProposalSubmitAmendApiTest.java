@@ -160,6 +160,16 @@ class ProposalSubmitAmendApiTest extends AbstractPostgresIntegrationTest {
                 "assessmentHash", assessed.get("assessmentHash").asText());
     }
 
+    private static int countAction(JsonNode audit, String action) {
+        int count = 0;
+        for (JsonNode event : audit) {
+            if (action.equals(event.get("action").asText())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     @Test
     void submitHappyPathBindsExactAssessment() {
         String analyst = token("TWIN_ANALYZE");
@@ -336,6 +346,8 @@ class ProposalSubmitAmendApiTest extends AbstractPostgresIntegrationTest {
         String analyst = token("TWIN_ANALYZE");
         String key = draft(analyst, removeGamma());
         Map<String, Object> submit = submitBody(assess(key, analyst));
+        HttpStatusCode submitOutcome;
+        int amendOutcome;
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             CountDownLatch start = new CountDownLatch(1);
@@ -354,26 +366,45 @@ class ProposalSubmitAmendApiTest extends AbstractPostgresIntegrationTest {
                         Map.of("title", "Race", "operations", removeGamma())).getStatus();
             });
             start.countDown();
-            HttpStatusCode submitOutcome = submitFuture.get(60, TimeUnit.SECONDS);
-            int amendOutcome = amendFuture.get(60, TimeUnit.SECONDS);
-            assertThat(submitOutcome).isIn(HttpStatus.OK, HttpStatus.CONFLICT);
-            assertThat(amendOutcome)
-                    .isIn(HttpStatus.OK.value(), HttpStatus.CONFLICT.value());
-            boolean submitOk = submitOutcome == HttpStatus.OK;
-            boolean amendOk = amendOutcome == HttpStatus.OK.value();
-            assertThat(submitOk && amendOk).isFalse();
+            submitOutcome = submitFuture.get(60, TimeUnit.SECONDS);
+            amendOutcome = amendFuture.get(60, TimeUnit.SECONDS);
         } finally {
             pool.shutdownNow();
         }
+
+        assertThat(submitOutcome).isIn(HttpStatus.OK, HttpStatus.CONFLICT);
+        assertThat(amendOutcome).isIn(HttpStatus.OK.value(), HttpStatus.CONFLICT.value());
+        boolean submitOk = submitOutcome == HttpStatus.OK;
+        boolean amendOk = amendOutcome == HttpStatus.OK.value();
+        // Submit and amend are serialisable, not mutually exclusive: submission
+        // moves the assessed revision to AWAITING_APPROVAL, and an amendment from
+        // any non-terminal state forges a fresh DRAFT revision (D29). Both can
+        // therefore succeed in the submit-then-amend order; at least one always
+        // must, and the optimistic lock prevents a lost update when they overlap.
+        assertThat(submitOk || amendOk).isTrue();
+
         JsonNode history = body(call(HttpMethod.GET, "/api/v1/twin/proposals/" + key + "/revisions",
                 token("TWIN_READ"), null));
-        if (history.size() == 2) {
-            assertThat(history.get(1).get("revisionNumber").asInt()).isEqualTo(2);
+        JsonNode audit = body(call(HttpMethod.GET, "/api/v1/twin/proposals/" + key + "/audit",
+                token("TWIN_READ"), null));
+        if (amendOk) {
+            assertThat(history.size()).isEqualTo(2);
+            assertThat(history.get(0).get("revisionNumber").asInt()).isEqualTo(1);
             assertThat(history.get(0).get("status").asText()).isEqualTo("SUPERSEDED");
+            assertThat(history.get(1).get("revisionNumber").asInt()).isEqualTo(2);
+            assertThat(history.get(1).get("status").asText()).isEqualTo("DRAFT");
+            assertThat(countAction(audit, "SUBMITTED")).isEqualTo(submitOk ? 1 : 0);
+            assertThat(audit.get(audit.size() - 2).get("action").asText()).isEqualTo("SUPERSEDED");
+            assertThat(audit.get(audit.size() - 2).get("revisionNumber").asInt()).isEqualTo(1);
+            assertThat(audit.get(audit.size() - 1).get("action").asText()).isEqualTo("CREATED");
+            assertThat(audit.get(audit.size() - 1).get("revisionNumber").asInt()).isEqualTo(2);
         } else {
+            assertThat(submitOk).isTrue();
             assertThat(history.size()).isOne();
-            assertThat(history.get(0).get("status").asText())
-                    .isIn("AWAITING_APPROVAL", "ASSESSED");
+            assertThat(history.get(0).get("revisionNumber").asInt()).isEqualTo(1);
+            assertThat(history.get(0).get("status").asText()).isEqualTo("AWAITING_APPROVAL");
+            assertThat(countAction(audit, "SUBMITTED")).isOne();
+            assertThat(countAction(audit, "SUPERSEDED")).isZero();
         }
     }
 
