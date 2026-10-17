@@ -1,217 +1,189 @@
-# Systivex
+<div align="center">
 
-**Agentic software-system twin & change-intelligence control plane.**
+# 🧠 Systivex
+
+### Software-System Twin & Change Intelligence Platform
+
+<p>
+Systivex builds a living <b>System Twin</b> of a software system so every proposed change
+can be reasoned about before anyone makes it. It deterministically analyses impact,
+assesses risk, simulates outcomes, evaluates policy, and records each decision in a
+governed, tamper-evident ledger.
+</p>
+
+![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot 4.1.1](https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![Maven 3.9.16](https://img.shields.io/badge/Maven-3.9.16-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)
 
 [![Backend CI](https://github.com/soubhagya-behera/systivex/actions/workflows/backend-ci.yml/badge.svg?branch=main)](https://github.com/soubhagya-behera/systivex/actions/workflows/backend-ci.yml)
-[![Java 21](https://img.shields.io/badge/Java-21-orange)](https://adoptium.net/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square)](LICENSE)
 
-Systivex builds a living **System Twin** of a software system — its code, architecture,
-data flows, and runtime behavior — so proposed changes can be **impact-analysed,
-risk-assessed, simulated, policy-evaluated, and governed through approval** before
-anything is asked to touch a real system.
+**[The Problem](#-the-problem) • [Features](#-features) • [Architecture](#-architecture-at-a-glance) • [Capabilities](#-capabilities-and-status) • [Quick Start](#-quick-start) • [Security](#-security-and-execution-boundaries)**
 
-It is deliberately a **control plane for safe engineering action**, not a point tool. It
-grounds reasoning in an authoritative model of the system and routes every consequential
-decision through explicit, auditable governance.
+</div>
 
-> **Controlled execution is not implemented.** An `APPROVED` proposal is a terminal
-> permission record — it authorizes nothing by itself and executes nothing. Acting on an
-> approval is a human step outside the system, and remains gated by the feasibility
-> decision recorded in [`DECISIONS.md`](DECISIONS.md) (D30/D31). There is no execution
-> endpoint, no executor role, and no target actuator in this repository.
+---
 
-## Architecture at a glance
+## 🎯 The Problem
+
+| Engineering Problem | The Systivex Approach |
+| --- | --- |
+| Dependencies are implicit and easy to miss | Persist a twin of services, APIs, databases, and their relationships |
+| Change impact is guessed rather than measured | Deterministic breadth-first impact analysis over the twin graph |
+| Risk is subjective and inconsistent | Ordinal `LOW`/`MEDIUM`/`HIGH`/`UNKNOWN` risk from impact paths and runtime facts |
+| Proposed-change consequences are difficult to assess before rollout | Hypothetical before/after simulation — nothing is executed |
+| Decisions are hard to audit | Governed proposals plus a hash-chained, verifiable audit ledger |
+
+---
+
+## ✨ Features
+
+<table>
+<tr><td width="50%"><strong>🧬 Persisted System Twin</strong><br/>A durable graph of services, APIs, databases, tables, and relationships in PostgreSQL.</td>
+<td width="50%"><strong>🔎 Read-only Synchronization</strong><br/>A connector loads source repositories and target services into twin rows without modifying anything.</td></tr>
+<tr><td width="50%"><strong>🧭 Change-Impact Analysis</strong><br/>Deterministic graph traversal returns ordered evidence paths for a proposed change.</td>
+<td width="50%"><strong>⚠️ Risk Assessment</strong><br/>Ordinal risk classification from impact paths and runtime facts; advisory, never authorization.</td></tr>
+<tr><td width="50%"><strong>🧪 Hypothetical Simulation</strong><br/>Before/after comparison over an in-memory graph, marked <code>simulated</code> and never persisted.</td>
+<td width="50%"><strong>📋 Advisory Policy Evaluation</strong><br/><code>ALLOW</code> / <code>REVIEW</code> / <code>DENY</code> over the simulated change — an input to judgement, not permission.</td></tr>
+<tr><td width="50%"><strong>🗳️ Governed Proposals</strong><br/>Immutable revisions with assessment, submission, and human approval or rejection under separation of duties.</td>
+<td width="50%"><strong>🔐 Tamper-evident Audit</strong><br/>A hash-chained, append-only ledger with an endpoint that verifies chain integrity.</td></tr>
+<tr><td width="50%"><strong>🛡️ JWT-protected API</strong><br/>Every <code>/api/v1/twin/*</code> endpoint requires a validated OAuth2 bearer token and an allowlisted role.</td>
+<td width="50%"><strong>📡 Runtime Observation</strong><br/>Pull-based health and allowlisted business counters feed the twin; the telemetry stack is local-only.</td></tr>
+</table>
+
+---
+
+## 🏗️ Architecture at a Glance
 
 ```mermaid
 flowchart TB
-    subgraph TARGET["Target environment — observed, never controlled"]
+    subgraph OBS["Observed inputs — read-only"]
         direction LR
-        SRC["Source repositories"]
-        SVC["Sample services<br/>gateway · order · payment · inventory"]
+        SRC["Sample-service source code<br/>backend/target-services/"]
+        SVC["Running sample services"]
     end
-
-    AUTH["OAuth2 JWT resource server<br/>issuer · audience · signature · roles"]
-    API["JWT-secured REST API boundary<br/>/api/v1/twin/*"]
-
-    subgraph PLANE["Systivex control plane — modular monolith (Spring Boot 4 · Java 21)"]
+    subgraph CORE["Systivex control plane — modular monolith (Spring Boot 4 · Java 21)"]
         direction LR
-        CONNECTOR["Read-only repository connector<br/>POST /api/v1/twin/sync"]
-        OBSERVE["Pull-based runtime observation<br/>POST /api/v1/twin/observations"]
-        TWIN[("System Twin<br/>services · APIs · databases · relationships")]
-
-        subgraph INTEL["Intelligence — deterministic, read-only"]
-            direction TB
-            IMPACT["Impact analysis<br/>GET /api/v1/twin/impact"]
-            RISK["Risk assessment<br/>GET /api/v1/twin/risk"]
-            SIM["Hypothetical simulation<br/>POST /api/v1/twin/simulations"]
-        end
-
-        POLICY["Advisory policy evaluation<br/>ALLOW · REVIEW · DENY<br/>advisory, not authorization"]
-        GOV["Governance and proposal decisions<br/>submit · assess · approve/reject"]
-        AUDIT["Tamper-evident audit ledger<br/>hash-chained · GET /api/v1/twin/audit/verify"]
+        CONN["Read-only repository connector"]
+        OBSERVE["Pull-based runtime observation"]
+        TWIN[("System Twin")]
+        IMPACT["Impact analysis"]
+        RISK["Risk assessment"]
+        SIM["Hypothetical simulation"]
+        POLICY["Advisory policy evaluation"]
+        GOV["Governed proposals"]
+        AUDIT["Tamper-evident audit ledger"]
     end
-
-    DB[("PostgreSQL<br/>Flyway-owned schema")]
-    EXECUTION{{"Execution boundary<br/>NOT IMPLEMENTED — GATED (D30/D31)"}}
-
-    SRC --> CONNECTOR --> TWIN
+    SRC --> CONN --> TWIN
     SVC --> OBSERVE --> TWIN
-    AUTH -. "protects every /api/v1/twin/* call" .-> API
-    API --> PLANE
+    AUTH["JWT resource server"] -. "guards every /api/v1/twin/* call" .-> API["JWT-secured REST API"]
+    API --> CORE
     TWIN --> IMPACT
     TWIN --> RISK
     TWIN --> SIM
     SIM --> POLICY
     GOV --> AUDIT
-    TWIN --- DB
-    GOV --- DB
-    AUDIT --- DB
-    GOV -. "APPROVED is terminal:<br/>authorizes nothing, executes nothing" .-> EXECUTION
+    CORE --- DB[("PostgreSQL")]
+    GOV -. "APPROVED is terminal" .-> EXECUTION{{"Execution boundary<br/>NOT IMPLEMENTED — GATED"}}
 ```
 
-The **control plane** is a modular monolith that owns the twin model, the intelligence
-modules, policy evaluation, governance, and the audit log. The **target environment** is a
-set of independently deployable sample services Systivex can observe but does not control.
-**Consequential actions cross the policy/execution boundary — and the execution side of
-that boundary is intentionally not built.**
+Full design, trust boundaries, and the deterministic-vs-advisory distinction live in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the deterministic-vs-advisory distinction and
-the trust boundaries, and [`THREAT_MODEL.md`](THREAT_MODEL.md) for the security principles.
+---
 
-## What Systivex is
+## 🧩 Capabilities and Status
 
-- A **software-system twin**: a persisted graph of services, APIs, databases, tables, and
-  the relationships between them, built by a read-only repository connector.
-- A **change-intelligence workspace**: deterministic impact analysis, ordinal risk
-  assessment, and *hypothetical* before/after simulation of a proposed change.
-- A **governance and audit layer**: governed change proposals with assessment, amendment,
-  approval/rejection, and a tamper-evident audit chain.
+| Capability | Status |
+| --- | --- |
+| System-twin persistence and REST | ✅ Implemented and tested |
+| Read-only repository synchronization | ✅ Implemented and tested |
+| Deterministic change-impact analysis | ✅ Implemented and tested |
+| Change-risk assessment (deterministic, advisory) | ✅ Implemented and tested |
+| Hypothetical change simulation | ✅ Implemented and tested |
+| Advisory policy evaluation | ✅ Implemented and tested |
+| Governed proposals and human decisions | ✅ Implemented and tested |
+| Tamper-evident audit verification | ✅ Implemented and tested |
+| JWT-protected API | ✅ Implemented and tested |
+| Runtime observation and telemetry integration | ✅ Implemented and tested |
+| Controlled execution | 🚧 Design-only — gated by D30/D31 |
+| Frontend / operator console | 📋 Planned, not implemented |
+| Agent orchestration, verification, Git integration | 📋 Planned, not implemented |
 
-## What Systivex is not
+Impact, risk, and simulation derive deterministically from the twin and never authorize
+change. Risk and policy evaluation are advisory; simulation is hypothetical and never
+executes. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) and [`DECISIONS.md`](DECISIONS.md).
 
-- Not an AI code reviewer, an SRE chatbot, a generic LLM wrapper, or a chat assistant over
-  logs.
-- Not an execution engine or an autonomous agent. Nothing in this repository changes a
-  target system, and no agent exists.
+---
 
-## Capabilities
+## 🚀 Quick Start
 
-| Capability | Surface | Status |
-| --- | --- | --- |
-| System-twin persistence and REST | `.../twin` | Implemented & tested |
-| Repository observation (read-only sync) | `POST /api/v1/twin/sync` | Implemented & tested |
-| Change-impact analysis | `GET /api/v1/twin/impact` | Implemented & tested |
-| Change-risk assessment | `GET /api/v1/twin/risk` | Implemented & tested |
-| Hypothetical change simulation | `POST /api/v1/twin/simulations` | Implemented & tested |
-| Advisory policy evaluation | `POST /api/v1/twin/policy-evaluations` | Implemented & tested |
-| Governed proposals | `.../proposal` | Implemented & tested |
-| Tamper-evident audit | `GET /api/v1/twin/audit/verify` | Implemented & tested |
-| Control-plane authentication | every `/api/v1/twin/*` call | Implemented & tested |
-| Runtime observation (health + counters) | `POST /api/v1/twin/observations` | Implemented & tested |
-| Controlled execution | — | **Design only — gated (D30/D31)** |
-| Frontend / operator console | — | Planned, not implemented |
-| Agent orchestration, post-change verification, Git integration | — | Planned, not implemented |
+**Prerequisites:** JDK 21 and, for the tests, a running **Docker** daemon (Testcontainers
+starts a throwaway PostgreSQL 18).
 
-The deterministic capabilities — impact analysis, risk assessment, and hypothetical
-simulation — are independent of any model and are not advisory. **Policy evaluation is
-advisory and never authorization. Simulation is hypothetical and never execution.** The
-backend is under active local development, is **not production-ready**, and is not
-deployed anywhere by this project. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for the
-phase-by-phase record of what exists.
-
-## Authentication
-
-The entire `/api/v1/twin/*` surface requires a **JWT bearer token**; the control plane is
-an OAuth2 **resource server** and validates issuer, audience, signature, expiry, and
-`nbf`, with allowlist-only role mapping.
-
-- Roles: `TWIN_READ`, `TWIN_ANALYZE`, `TWIN_OPERATOR`, `TWIN_ADMIN`, `TWIN_APPROVER`.
-  `TWIN_ADMIN` inherits the first three but never `TWIN_APPROVER`.
-- Configuration is fail-closed via `systivex.security.jwt.*`; a trusted `issuer-uri` is
-  **mandatory** and there is no security-off mode.
-- There is **no login flow, no bundled identity provider, and no default credentials** in
-  this repository. You must configure a trusted issuer and obtain a token from it.
-- Automated tests use locally generated signing keys only; **live identity-provider
-  verification is still pending** a configured trusted issuer and is not claimed.
-
-Configuration details are in [`DEVELOPMENT.md`](DEVELOPMENT.md).
-
-## Quick start
-
-Prerequisite: **JDK 21** (`JAVA_HOME` must point at a JDK 21 installation) and, for the
-tests, a running **Docker** daemon (Testcontainers PostgreSQL). PostgreSQL 18 is required
-only to run the application locally.
+```bash
+cd backend
+chmod +x ./mvnw      # Unix/Linux/macOS: make the Maven wrapper executable
+./mvnw test          # requires Docker
+```
 
 ```powershell
 cd backend
-$env:JAVA_HOME="C:\Program Files\Java\jdk-21.0.10"
-$env:Path="C:\Program Files\Java\jdk-21.0.10\bin;" + $env:Path
-./mvnw clean test        # requires Docker (Testcontainers PostgreSQL)
-./mvnw package -DskipTests
+.\mvnw.cmd test      # Windows PowerShell; requires Docker
 ```
 
-Running the application also requires a trusted JWT issuer, a local PostgreSQL database,
-and the `SYSTIVEX_DB_PASSWORD` environment variable. Full instructions, including
-authentication configuration, are in [`DEVELOPMENT.md`](DEVELOPMENT.md).
+<details>
+<summary>Running the application locally</summary>
 
-## Repository layout
+Startup needs PostgreSQL 18, a trusted JWT issuer, and the `SYSTIVEX_DB_PASSWORD`
+environment variable. There is no security-off mode and no default credentials, so the app
+will not start without a configured issuer. Full instructions — database setup, issuer
+configuration, and `./mvnw spring-boot:run` — are in [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-```text
-systivex/
-├── backend/                 # Spring Boot control plane (Java 21, Maven wrapper)
-│   │   ├── .../twin/        # twin model, persistence, REST
-│   │   ├── .../observation/ # repo connector + POST /api/v1/twin/sync
-│   │   ├── .../intelligence/# impact, risk, hypothetical simulation
-│   │   ├── .../telemetry/   # pull-based runtime annotation
-│   │   ├── .../policy/      # advisory policy evaluation
-│   │   ├── .../proposal/    # governed proposals + tamper-evident audit
-│   │   └── .../security/    # JWT resource server, role policy
-│   └── target-services/     # sample target environment (gateway/order/payment/inventory)
-├── observability/           # local collector + Prometheus + Loki + Grafana (telemetry only)
-├── ARCHITECTURE.md          # target architecture + current status
-├── DEVELOPMENT.md           # build, test, run, configure
-├── PROJECT_STATUS.md        # phase-by-phase record of what exists
-├── DECISIONS.md             # architectural decisions (D29–D32 relevant to governance/licensing)
-├── THREAT_MODEL.md          # trust principles
-├── CONTRIBUTING.md          # how to contribute
-├── CODE_OF_CONDUCT.md       # contributor code of conduct
-├── SECURITY.md              # how to report a vulnerability
-└── LICENSE                  # Apache License 2.0
-```
+</details>
 
-## Contributing
+---
 
-Contributions are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
-architecture overview, prerequisites, verified build/test commands, and review
-expectations. All participation is covered by
-[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+## 🛡️ Security and Execution Boundaries
 
-## Security
+> **Controlled execution is not implemented. An `APPROVED` proposal is a terminal
+> governance record; it does not authorize or execute an operation.**
 
-Please report vulnerabilities privately — **do not open a public issue**. See
-[`SECURITY.md`](SECURITY.md) for the supported reporting route.
+Every `/api/v1/twin/*` endpoint requires a validated OAuth2 bearer token and an allowlisted
+role (`TWIN_READ`, `TWIN_ANALYZE`, `TWIN_OPERATOR`, `TWIN_ADMIN`, `TWIN_APPROVER`). There is
+no login flow, no bundled identity provider, and no default credentials; live
+identity-provider verification is pending and not claimed. Systivex is not an execution
+engine, agent, or tool broker, and no target actuator exists — report issues via
+[`SECURITY.md`](SECURITY.md).
 
-## Project rules (binding)
+---
 
-- Java 21, Spring Boot 4.1.1, Maven (wrapper).
-- Modular monolith for the Systivex control plane; microservices are reserved for the
-  target environment.
-- PostgreSQL as primary persistence (Flyway-owned schema, Hibernate validates only).
-- REST initially; no Kafka, RabbitMQ, Kubernetes, WebSockets, vector databases, MCP,
-  multi-agent architecture, or cloud infrastructure at this stage.
-- When the frontend lands, it follows the repository convention: **React/Vite with
-  JavaScript, not TypeScript**, unless a future recorded decision changes it.
-- Proposed execution capabilities, authentication changes, security-sensitive behavior,
-  and new infrastructure require careful review and must not bypass existing decisions.
+## 🗂️ Project Structure
 
-## License
+`backend/` holds the Java 21 control plane (with its sample `target-services/`), and
+`observability/` holds a local telemetry stack (collector, Prometheus, Loki, Grafana).
 
-Systivex is licensed under the **Apache License, Version 2.0**. The full license text is in
+| Document | Purpose |
+| --- | --- |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design and trust boundaries |
+| [`DEVELOPMENT.md`](DEVELOPMENT.md) | Build, test, run, and configuration |
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Phase-by-phase record of what exists |
+| [`DECISIONS.md`](DECISIONS.md) | Architectural decisions (D29–D32) |
+| [`THREAT_MODEL.md`](THREAT_MODEL.md) | Security principles and threat model |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute |
+| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community expectations |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability |
+
+---
+
+## 🤝 Contributing and License
+
+Contributions are welcome — start with [`CONTRIBUTING.md`](CONTRIBUTING.md). Proposed
+execution, authentication, or security-sensitive changes require review and must not bypass
+existing decisions. Systivex is licensed under the **Apache License 2.0**; see
 [`LICENSE`](LICENSE).
 
-Copyright 2026 Soubhagya Kumar Behera.
-
-Unless required by applicable law or agreed to in writing, software distributed under the
-License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.
-This is a summary; the [`LICENSE`](LICENSE) file governs. It is not legal advice.
+<div align="center">
+<sub>Copyright 2026 Soubhagya Kumar Behera</sub>
+</div>
