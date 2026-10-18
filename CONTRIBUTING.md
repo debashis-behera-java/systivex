@@ -123,15 +123,15 @@ coordinate.
 
 1. **Add an `.editorconfig`.** Define consistent indentation and line endings for Java,
    Markdown, YAML, and properties files. No behavior change.
-2. **Expand the deterministic parser/validator unit tests.** Add edge-case tests for the
-   telemetry parsers (`HealthParser`, `PrometheusCounterParser`) and the impact/risk query
-   validators. Pure test additions; no production code change required.
+2. **Expand the telemetry parser unit tests.** Add edge-case tests for the deterministic
+   `HealthParser` and `PrometheusCounterParser` (size and line bounds, malformed and
+   out-of-range values, timestamped samples, ignored lines). Pure test additions; no
+   production code change required.
 3. **Document a sanitized manual API walkthrough.** Add a token-based, step-by-step
    example (sync → impact → risk → simulation → policy) to `DEVELOPMENT.md`, using
-   placeholders and no committed secrets or tokens.
-4. **Add a CI status badge to the README.** Once the backend workflow is running on the
-   primary branch, add the status badge near the top of `README.md`.
-5. **Design note for twin list pagination.** The twin entity/relationship `GET` endpoints
+   placeholders and no committed secrets or tokens. Include the `Authorization: Bearer`
+   header and the required role for each call (see the Phase 10 section).
+4. **Design note for twin list pagination.** The twin entity/relationship `GET` endpoints
    currently return unpaged lists. Draft a short design note (an issue, not code) for
    adding pagination and filtering consistently with the existing API conventions before
    implementing it.
