@@ -108,12 +108,16 @@ Execution-related proposals must respect the recorded decisions: controlled exec
 simulation must remain clearly distinct from real execution (see
 [`DECISIONS.md`](DECISIONS.md) D29–D31).
 
-## Frontend convention (for when a frontend exists)
+## Frontend convention (authorized, not yet implemented)
 
-The repository has **no frontend yet**. When one is added, the convention is
-**React with Vite in JavaScript — not TypeScript** — unless a future recorded decision
-explicitly changes it (see `.gitignore` and `PROJECT_STATUS.md`). Do not start a frontend
-without a decision authorizing it.
+A scoped, read-only operator console is **authorized** by `DECISIONS.md` D33
+(Phase 13 S1), but it is **not implemented** — no frontend files, Node toolchain, or CI
+job exist yet. When frontend work lands, the convention is **React with Vite in
+JavaScript — not TypeScript** — unless a future recorded decision explicitly changes it
+(see `.gitignore` and `PROJECT_STATUS.md`). The console is read-only, limited to existing
+`TWIN_READ` GET endpoints, and local-development-only; do not extend it with sync,
+observation, twin-write, or proposal-mutation actions, and do not add backend CORS rules
+or a bundled identity provider without a recorded decision.
 
 ## Good first contributions
 

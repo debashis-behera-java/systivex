@@ -108,7 +108,7 @@ Full design, trust boundaries, and the deterministic-vs-advisory distinction liv
 | JWT-protected API | ✅ Implemented and tested |
 | Runtime observation and telemetry integration | ✅ Implemented and tested |
 | Controlled execution | 🚧 Design-only — gated by D30/D31 |
-| Frontend / operator console | 📋 Planned, not implemented |
+| Frontend / operator console | 📋 Authorized (Phase 13 S1, D33) — not implemented |
 | Agent orchestration, verification, Git integration | 📋 Planned, not implemented |
 
 Impact, risk, and simulation derive deterministically from the twin and never authorize
@@ -169,7 +169,7 @@ engine, agent, or tool broker, and no target actuator exists — report issues v
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design and trust boundaries |
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Build, test, run, and configuration |
 | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Phase-by-phase record of what exists |
-| [`DECISIONS.md`](DECISIONS.md) | Architectural decisions (D29–D32) |
+| [`DECISIONS.md`](DECISIONS.md) | Architectural decisions (D29–D33) |
 | [`THREAT_MODEL.md`](THREAT_MODEL.md) | Security principles and threat model |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute |
 | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community expectations |
