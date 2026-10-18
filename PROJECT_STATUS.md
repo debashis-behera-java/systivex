@@ -5,15 +5,15 @@ whenever the implemented state changes. Planned items are not claimed as done.
 
 ## Current phase
 
-**Phase 12 — Controlled execution (design/feasibility only).** D30 records
-the binding controlled-execution constraints (Phase 12 S0, 2026-10-16);
-D31 records the execution feasibility gate (Phase 12 S1, 2026-10-17).
-Systivex remains simulation/approval-only and `APPROVED` stays terminal
-(D29 preserved, not superseded). No execution endpoint, migration,
-executor-role wiring, or actuator exists. Phases 0–11 below are kept as
-history.
+**Phase 13 S1 — Read-only operator console (authorized 2026-10-18;
+documentation/decision only — implementation not started).**
+`DECISIONS.md` D33 authorizes a scoped, read-only React + Vite + JavaScript
+operator console beginning with the System Twin explorer (Phase 13 S1). No
+frontend files exist yet and none has been started; D33 is the checkpoint
+that permits the first UI slice. D29–D31 are unchanged and controlled
+execution stays gated. Phases 0–12 below are kept as history.
 
-## Next phase (gated, not scheduled)
+## Gated, not scheduled — controlled execution
 
 **Execution implementation — gated by the D31 feasibility gate.** No
 current simulation operation qualifies: each is a hypothetical-graph edit
@@ -26,6 +26,36 @@ and dispatch-time revalidation, a durable intent/result/audit design, and
 an explicit D29-change decision are all satisfied and approved. Until then
 execution remains unimplemented — stated plainly, not filled with
 scaffolding.
+
+## Phase 13 S1 — Read-only operator console (authorized 2026-10-18;
+documentation/decision only — implementation not started)
+
+- [x] `DECISIONS.md` D33 records the Phase 13 S1 decision: a scoped,
+  read-only **React + Vite + JavaScript** operator console, starting with the
+  **System Twin explorer** (entity/relationship browsing, entity details where
+  supported, dependency graph, and accessible loading/empty/error states).
+  TypeScript is not authorized.
+- [x] S1 is limited to existing `TWIN_READ` GET endpoints. No sync,
+  observation, twin-write, or proposal-lifecycle mutation capability is
+  authorized.
+- [x] Authentication remains mandatory (D28). The manually supplied bearer
+  token is a local-development-only, **in-memory** bridge — cleared on reload
+  and never logged, rendered, placed in a URL, or persisted in
+  `localStorage`, `sessionStorage`, `IndexedDB`, cookies, or other storage.
+  No bundled identity provider, fake login, invented issuer, placeholder
+  production credentials, or security-off mode. Trusted issuer/client details
+  are still missing, so **live authentication verification remains blocked**.
+- [x] S1 uses the **Vite development proxy** and adds no backend CORS rules;
+  production serving is deferred to a separately reviewed decision. The UI is
+  local-development-only until shared-environment serving, identity,
+  deployment, and security requirements are reviewed.
+- [x] No new backend endpoints, database migrations, backend dependencies,
+  executor role, or actuator are authorized by S1. D29–D31 remain unchanged
+  and `APPROVED` stays terminal; no operation is executed.
+- [ ] Frontend implementation (System Twin explorer) — **not started**; no
+  frontend files, Node toolchain, or CI job exist yet. Later UI slices
+  (impact/risk, simulation/policy, governance/audit) each require their own
+  scope and verification checkpoint.
 
 ## Phase 13 S0 — Open-source contributor readiness (recorded 2026-10-17;
 licensing + contributor docs + CI only, no application change)

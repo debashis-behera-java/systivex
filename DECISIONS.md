@@ -5,7 +5,8 @@ extended in Phase 1 and Phase 2A (2026-09-29), Phase 2B and Phase 3A (2026-09-30
 Phase 3B-1/3B-2 (2026-10-06/07), Phase 4 (2026-10-09), Phase 5 (2026-10-10),
 Phase 6 (2026-10-13), Phase 7 (2026-10-14), Phases 8/9 (2026-10-15),
 Phase 10 (2026-10-15), Phase 11 (2026-10-15/16), Phase 12 S0/S1
-(2026-10-16/17), and Phase 13 S0 (2026-10-17).
+(2026-10-16/17), Phase 13 S0 (2026-10-17), and Phase 13 S1 authorized
+(2026-10-18).
 Status labels: **decided** (binding now) / **planned** (intent, not yet implemented).
 
 ## D1. Java 21 — decided
@@ -1007,6 +1008,82 @@ Status labels: **decided** (binding now) / **planned** (intent, not yet implemen
   choice, not legal advice.
 - **State:** Recorded and decided (documentation, community files, and CI only). See
   `PROJECT_STATUS.md` Phase 13 S0. Nothing here is runtime behavior.
+
+## D33. Phase 13 S1 — Read-only operator console (decided) — 2026-10-18
+
+- **Decision:** Phase 13 S1 authorizes a **scoped, read-only operator
+  console** — a **React + Vite + JavaScript** frontend (**TypeScript is not
+  authorized**). S1 is limited to the **read-only System Twin explorer**:
+  entity/relationship browsing, entity details where supported, a dependency
+  graph, and accessible loading/empty/error states. S1 may call **only
+  existing `TWIN_READ` GET endpoints** (`/api/v1/twin/entities[/{id}]` and
+  `/api/v1/twin/relationships[/{id}]`; impact/risk and proposal/audit reads
+  belong to later slices). It adds **no** sync, observation, twin-write, or
+  proposal-lifecycle mutation capability. This decision authorizes **no
+  runtime code**: no frontend files exist, and this record is the checkpoint
+  that permits the first UI slice.
+- **Frontend convention:** React with Vite in **JavaScript — not TypeScript**
+  — consistent with `CONTRIBUTING.md`. Introducing TypeScript requires its own
+  future decision.
+- **Authentication (mandatory, unchanged):** the control plane remains an
+  OAuth2 JWT resource server (D28). The proposed **manually supplied bearer
+  token** is a **local-development-only bridge**: held **in memory only**,
+  cleared on reload, and **never logged, rendered, placed in a URL, or
+  persisted** in `localStorage`, `sessionStorage`, `IndexedDB`, cookies, or
+  any other storage. There is **no bundled identity provider, no fake login,
+  no invented issuer, no placeholder production credentials, and no
+  security-off mode** (`enabled=false` is still rejected at startup). The
+  trusted issuer and client details remain **missing**, so **live
+  authentication verification stays blocked** until legitimate configuration
+  is supplied; the gap is documented, not fabricated.
+- **Serving and CORS:** S1 uses the **Vite development proxy** (same-origin
+  during development) and adds **no backend CORS rules**. Serving the console
+  in a shared or production environment is **explicitly deferred** to a
+  separately reviewed decision (the backend has `anyRequest().denyAll()` and
+  no CORS today — `SecurityConfig`). The UI is **local-development-only**
+  until the serving, identity, deployment, and security requirements for a
+  shared environment are reviewed.
+- **Scope boundaries:** S1 introduces **no new backend endpoints, no database
+  migration, no backend dependencies, no executor role, and no actuator**.
+  D29–D31 remain unchanged: controlled execution stays unimplemented and
+  gated, `APPROVED` stays terminal, and **no operation is executed**.
+  Simulation and policy evaluation (later slices) remain **hypothetical,
+  non-persistent, and advisory**.
+- **Slice gating:** subsequent UI slices — impact/risk, simulation/policy,
+  and governance/audit — each require their **own scope and verification
+  checkpoint** before implementation; nothing beyond S1 is authorized here.
+- **Rationale:** the backend already exposes deterministic, JWT-guarded read
+  analysis and governed records, but no human surface. A bounded read-only
+  console makes that state inspectable without adding mutation, execution, or
+  new trust boundaries. Starting with the System Twin explorer exercises the
+  full stack (auth handling, API client, routing, graph rendering,
+  loading/empty/error states) against the safest `TWIN_READ` GETs and surfaces
+  the CORS/serving and authentication questions before higher-risk views.
+- **Rejected alternatives:** TypeScript; adding backend CORS rules or
+  same-origin static hosting in S1 (an unreviewed security-surface change); a
+  bundled or fake identity provider, or invented issuer/client configuration;
+  persisting tokens in any browser storage; authentication-off or placeholder
+  credentials; including sync/observation/twin-write/proposal-mutation
+  actions; promising every view in the first release; and any execution or
+  `TWIN_EXECUTOR` work (D29–D31 unchanged).
+- **Dependencies / blockers:** a legitimate trusted issuer and registered
+  client details (issuer discovery URL, client id, redirect URIs) are required
+  for a real browser login (OIDC Authorization Code + PKCE) and are **not
+  available** — the manual in-memory token bridge is the interim local-only
+  path. When code lands, a frontend CI job and `README` / `ARCHITECTURE` /
+  `CONTRIBUTING` / `PROJECT_STATUS` updates are the documentation
+  obligations. `CONTRIBUTING.md` previously stated that no decision
+  authorized a frontend; this decision supersedes that statement.
+- **Verification expectations:** S1 lands only with green checks for the API
+  client (role handling: 401/403 with the fixed safe messages), accessible
+  states (loading/empty/error), and a manual smoke test against a locally
+  running control plane using a developer-supplied token; **no live
+  identity-provider verification is claimed**. Token-handling behavior (in
+  memory, no storage, no logging, never in URLs) is reviewed against
+  `THREAT_MODEL.md`.
+- **State:** Recorded and decided (documentation/decision only; **no frontend
+  files exist**). See `PROJECT_STATUS.md` Phase 13 S1. Nothing here is runtime
+  behavior until a slice lands with verification.
 
 ## Supersession rule
 

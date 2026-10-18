@@ -1,7 +1,7 @@
 # Systivex Architecture
 
 Status: **target architecture (planned) + current implementation status**
-(documentation reviewed 2026-10-17; last runtime test verification
+(documentation reviewed 2026-10-18; last runtime test verification
 2026-10-16, Phase 11 S6).
 Nothing below beyond "Current implementation" should be read as implemented.
 
@@ -101,6 +101,13 @@ placeholder packages exist for them by decision:
 Module rules (binding for future work): modules communicate through explicit
 APIs; no cross-module persistence access; every consequential action crosses
 the policy/execution boundary (see §6).
+
+The **frontend is authorized but not implemented** (it is not a control-plane
+module): `DECISIONS.md` D33 (Phase 13 S1, 2026-10-18) authorizes a scoped,
+read-only React + Vite + JavaScript operator console beginning with the System
+Twin explorer, limited to existing `TWIN_READ` GET endpoints. It adds no
+backend endpoint or CORS rule and stays local-development-only until the
+serving and identity requirements for a shared environment are reviewed.
 
 ## 4. Target microservices (Phase 2B persistent runtime; observation planned)
 
@@ -320,10 +327,14 @@ See `THREAT_MODEL.md` for the principles these boundaries enforce.
   `TWIN_ADMIN`);
   `GET /actuator/health` anonymous (status only),
   `/actuator/prometheus` requires `TWIN_READ`, all else denied.
+- **Read-only operator console (authorized, not implemented).** `DECISIONS.md`
+  D33 (Phase 13 S1) authorizes a scoped React + Vite + JavaScript console
+  consuming only existing `TWIN_READ` GET endpoints (System Twin explorer
+  first). No frontend code exists and no API surface is added.
 - **SSE** for streaming long-running analysis/simulation progress (planned).
 - No WebSockets at this stage (see `DECISIONS.md`).
 
-## 8. Current implementation status (documentation reviewed 2026-10-17; last runtime test verification 2026-10-16, Phase 11 S6)
+## 8. Current implementation status (documentation reviewed 2026-10-18; last runtime test verification 2026-10-16, Phase 11 S6)
 
 Implemented:
 
@@ -454,8 +465,9 @@ Intentionally absent (not bugs — deferred by decision):
   Phase 8, above; advisory policy evaluation is Phase 9, above;
   control-plane authentication is Phase 10, above; governed proposals,
   approvals, and the tamper-evident audit are Phase 11, above).
-- Redis, Spring AI / Ollama, frontend (control-plane security is done;
-  target-service authentication is still deferred).
+- Redis, Spring AI / Ollama, and target-service authentication (still
+  deferred). The frontend is **authorized (Phase 13 S1, D33) but not
+  implemented** — no frontend code, Node toolchain, or CI job exists yet.
 - Grafana log dashboards, Tempo trace UI, unified trace/log UI, anomaly
   detection, any agent use of telemetry (later 3B slices and later).
 - Docker packaging of the Java services, Kafka / RabbitMQ / Kubernetes /
@@ -472,6 +484,9 @@ operation has a meaningful, independently verifiable target actuator
 (all three are hypothetical-graph edits; the target services expose
 business POSTs and a read-only Actuator surface only). `APPROVED`
 stays terminal (D29) until a specific operation and actuator satisfy
-the gate and a D29 change is explicitly decided. Still without agents,
-no implementation yet, and never exposed beyond the local machine
-before the deferred authentication story lands.
+the gate and a D29 change is explicitly decided. The currently authorized
+next work is Phase 13 S1 — a scoped, read-only operator console
+(`DECISIONS.md` D33) — which is likewise **not implemented**; execution stays
+gated and separate. Still without agents, no implementation yet, and never
+exposed beyond the local machine before the deferred authentication story
+lands.

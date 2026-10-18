@@ -283,6 +283,23 @@ itself a place data can leak. The following holds for the current pipeline
   uncertain is never automatically redispatched; partial effects require
   a separately approved recovery/compensation contract; unresolved
   outcomes stay `UNVERIFIED` (T4/T5/T7).
+- **Phase 13 S1 read-only operator console (authorized 2026-10-18; not
+  implemented).** `DECISIONS.md` D33 authorizes a scoped React + Vite +
+  JavaScript console limited to the System Twin explorer over existing
+  `TWIN_READ` GET endpoints. Authentication stays mandatory (D28): the
+  manually supplied bearer token is a local-development-only bridge held
+  **in memory only** — cleared on reload and never logged, rendered, placed
+  in a URL, or persisted in `localStorage`, `sessionStorage`, `IndexedDB`,
+  cookies, or any other storage. There is no bundled identity provider, fake
+  login, invented issuer, placeholder production credential, or
+  security-off mode; the trusted issuer/client details remain missing, so
+  live authentication verification is still blocked (documented, not
+  fabricated). S1 uses the Vite development proxy and adds no backend CORS
+  rule and no backend endpoint; production/shared serving is deferred to a
+  separately reviewed decision. The UI stays local-development-only and adds
+  no execution or mutating capability; D29–D31 are unchanged. This is a
+  design authorization, not a deployed surface: no frontend code exists yet,
+  and none of it is claimed as verified.
 
 ## 3. Out-of-scope today, in-scope for design
 
