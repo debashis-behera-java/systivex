@@ -92,6 +92,8 @@ class PolicyControllerTest {
                                 .value(PolicyService.ADVISORY))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.rulesFired").isArray())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.simulation").exists())
+                .andExpect(
+                        MockMvcResultMatchers.jsonPath("$.simulation.limitations").isArray())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.note").exists());
     }
 
